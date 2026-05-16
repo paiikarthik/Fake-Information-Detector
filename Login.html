@@ -6,43 +6,137 @@
     <title>Login Now</title>
     <style>
         body{
-            display: flex;
-            
+           margin: 0;
+           font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+           background: #25170f;  
 
+        }
+
+        .navbar{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(to bottom, #000000, #25170f);
+            padding: 15px 30px;
         }
         #logo{
             font-size: 20px;
             text-decoration: solid;
-            display: flex;
+            color: white;
+            font-family: monospace;
         }
 
-        #navig{
-            background: brown;
-        }
+
         #navig ul{
             display: flex;
-            gap: 10px;
+            gap: 20px;
             list-style: none;
+            margin: 0;
+            padding:0;
             
         }
-        ul li a{
+        #navig ul li a{
             text-decoration: none;
+            color: white;
+            font-size: 18px;
             
+        }
+
+        #navig ul li a:hover{
+            color: yellow;
+        }
+
+        .container{
+            display: flex;
+            justify-content: center;
+
+            align-items: center;
+            height: 85vh;
+        }
+
+        .forms{
+            width: 320px;
+            padding: 30px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 15px;
+            box-shadow: 0px 0px 20px rgba(0,0,0,0.5);
+            color: white;
+        }
+
+        .forms h2{
+            text-align: center;
+            margin-bottom: 25px;
+            color: #ffcc70;
+        }
+
+        .forms label{
+            font-size: 15px;
+        }
+
+         .forms input[type="text"],
+        .forms input[type="password"]{
+            width: 100%;
+            padding: 10px;
+            margin-top: 8px;
+            margin-bottom: 18px;
+
+            border: none;
+            border-radius: 8px;
+
+            background: #f1f1f1;
+            font-size: 14px;
+        }
+
+        .forms input[type="submit"]{
+            width: 100%;
+            padding: 10px;
+
+            border: none;
+            border-radius: 8px;
+
+            background: #ffb347;
+            color: black;
+
+            font-size: 16px;
+            font-weight: bold;
+
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+          .forms input[type="submit"]:hover{
+            background: #ffcc70;
         }
     </style>
 </head>
 <body>
-    <div id="logo">FakeXpose AI
+    <div class="navbar">
+    <div id="logo">FakeXpose AI</div>
 
     <nav id="navig">
         <ul>
-            <li><a href="Home">Home</a></li>
-            <li><a href="Home">About</a></li>
-            <li><a href="Home">Contact</a></li>
-            <li><a href="Home">Signup</a></li>
+            <li><a href="#">Home</a></li>
+            <li><a href="#">About</a></li>
+            <li><a href="#">Contact</a></li>
+            <li><a href="#">Signup</a></li>
         </ul>
 
     </nav>
+ 
     </div>
+ <div class="container">
+    <div class="forms">
+        <form action="">
+            <label for="name">Enter Email ID</label><br>
+            <input type="text" name="name" id="name" required><br><br>
+
+            <label for="password">Enter Your password</label><br>
+            <input type="password" name="password" id="password"><br><br>
+
+
+            <input type="submit" value="submit">
+        </form>
+    </div>
+</div>
 </body>
 </html>
