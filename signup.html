@@ -148,7 +148,7 @@
 
             <label for="password">Enter Your password</label>
             <input type="password" name="password" id="password"><br><br><br>
-            <input type="submit" value="submit">
+         <input type="submit" value="submit" id="submit">
             <p>Already Have an Account? <a href="Login.html"> Login Now</a></p>
         </form>
     </div>
@@ -252,7 +252,77 @@
         }
 
     });
-    
+// let s = "Working";
+//     const submit=document.getElementById('submit');
+//     submit.addEventListener("click",function (event){
+//         event.preventDefault()
+//         alert(s)
+//     })
+//    
+ </script>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
+
+import {
+  getAuth,
+  createUserWithEmailAndPassword
+} from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
+
+
+// Firebase Config
+const firebaseConfig = {
+  apiKey: "AIzaSyDL_fcHMqPF26LrcaDgy6BSTSDx3iWT-XE",
+  authDomain: "fake-news-detection-f9154.firebaseapp.com",
+  projectId: "fake-news-detection-f9154",
+  storageBucket: "fake-news-detection-f9154.firebasestorage.app",
+  messagingSenderId: "327331005701",
+  appId: "1:327331005701:web:1c80a10522f4251d10636c"
+};
+
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
+const auth = getAuth(app);
+
+
+// FORM
+const form = document.querySelector("form");
+
+form.addEventListener("submit", async function(event){
+
+    event.preventDefault();
+
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+
+    try {
+
+        const userCredential =
+        await createUserWithEmailAndPassword(
+            auth,
+            email,
+            password
+        );
+
+window.location.href = "index.html";
+
+        console.log(userCredential.user);
+
+    }
+
+    catch(error){
+
+        alert("Email Already Exits, Use new Email");
+
+        console.log(error);
+
+    }
+
+});
+
 </script>
 </body>
 </html>
