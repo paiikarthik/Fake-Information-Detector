@@ -141,7 +141,7 @@
         <form action="">
 
             <label for="name">Enter Your Name</label>
-            <input type="text" name="name" id="name">
+            <input type="text" name="name" id="name"><br><br>
 
             <label for="name">Enter Email ID</label><br>
             <input type="email" name="email" id="email" required><br>
@@ -153,5 +153,65 @@
         </form>
     </div>
 </div>
+
+<SCRipt>
+  
+
+    let nameInput = document.getElementById("name");
+    let emailInput = document.getElementById("email");
+    let passwordInput = document.getElementById("password");
+
+   
+    let nameError = document.createElement("small");
+    let emailError = document.createElement("small");
+    let passwordError = document.createElement("small");
+
+    nameError.style.color = "red";
+    emailError.style.color = "red";
+    passwordError.style.color = "red";
+
+   
+    nameInput.after(nameError);
+    emailInput.after(emailError);
+    passwordInput.after(passwordError);
+
+  
+    nameInput.addEventListener("input", function () {
+
+        if (nameInput.value.length < 3) {
+            nameError.textContent = "Name must be at least 3 characters";
+        }
+        else {
+            nameError.textContent = "";
+        }
+
+    });
+
+   
+    emailInput.addEventListener("input", function () {
+
+        let pattern = /^[^ ]+@[^ ]+\.[a-z]{2,3}$/;
+
+        if (!emailInput.value.match(pattern)) {
+            emailError.textContent = "Enter valid email";
+        }
+        else {
+            emailError.textContent = "";
+        }
+
+    });
+
+   
+    passwordInput.addEventListener("input", function () {
+
+        if (passwordInput.value.length < 6) {
+            passwordError.textContent = "Password must be at least 6 characters";
+        }
+        else {
+            passwordError.textContent = "";
+        }
+
+    });
+</SCRipt>
 </body>
 </html>
