@@ -122,7 +122,7 @@
 </head>
 <body>
     <div class="navbar">
-    <div id="logo">FakeXpose AI</div>
+    <div id="logo">FakeXpose AI <i class="fa-solid fa-shield"></i></div>
 
     <nav id="navig">
         <ul>
@@ -141,17 +141,118 @@
         <form action="">
 
             <label for="name">Enter Your Name</label>
-            <input type="text" name="name" id="name">
+            <input type="text" name="name" id="name"><br><br>
 
-            <label for="name">Enter Email ID</label><br>
-            <input type="email" name="email" id="email" required><br>
+            <label for="name">Enter Email ID</label>
+            <input type="email" name="email" id="email" required><br><br>
 
-            <label for="password">Enter Your password</label><br>
+            <label for="password">Enter Your password</label>
             <input type="password" name="password" id="password"><br><br><br>
             <input type="submit" value="submit">
             <p>Already Have an Account? <a href="Login.html"> Login Now</a></p>
         </form>
     </div>
 </div>
+
+<script>
+
+    let nameInput = document.getElementById("name");
+    let emailInput = document.getElementById("email");
+    let passwordInput = document.getElementById("password");
+
+    // Error message elements
+    let nameError = document.createElement("small");
+    let emailError = document.createElement("small");
+    let passwordError = document.createElement("small");
+
+    nameError.style.color = "red";
+    emailError.style.color = "red";
+    passwordError.style.color = "red";
+
+   
+    nameInput.after(nameError);
+    emailInput.after(emailError);
+    passwordInput.after(passwordError);
+
+   
+    nameInput.addEventListener("input", function () {
+
+        let namePattern = /^[A-Za-z ]+$/;
+
+        if (nameInput.value.trim() == "") {
+            nameError.textContent = "Name cannot be empty";
+        }
+
+        else if (!nameInput.value.match(namePattern)) {
+            nameError.textContent = "Name must contain only letters";
+        }
+
+        else if (nameInput.value.length < 3) {
+            nameError.textContent = "Name must be at least 3 characters";
+        }
+
+        else {
+            nameError.textContent = "";
+        }
+
+    });
+
+    emailInput.addEventListener("input", function () {
+
+        let emailPattern = /^[^ ]+@[^ ]+\.[a-z]{2,3}$/;
+
+        if (!emailInput.value.match(emailPattern)) {
+            emailError.textContent = "Enter valid email";
+        }
+
+        else {
+            emailError.textContent = "";
+        }
+
+    });
+
+
+    passwordInput.addEventListener("input", function () {
+
+        let password = passwordInput.value;
+
+        let upperCase = /[A-Z]/;
+        let lowerCase = /[a-z]/;
+        let number = /[0-9]/;
+        let specialChar = /[!@#$%^&*(),.?":{}|<>]/;
+
+        if (password.length < 8) {
+            passwordError.textContent =
+                "Password must be at least 8 characters";
+        }
+
+        else if (!upperCase.test(password)) {
+            passwordError.textContent =
+                "Password must contain an uppercase letter";
+        }
+
+        else if (!lowerCase.test(password)) {
+            passwordError.textContent =
+                "Password must contain a lowercase letter";
+        }
+
+        else if (!number.test(password)) {
+            passwordError.textContent =
+                "Password must contain a number";
+        }
+
+        else if (!specialChar.test(password)) {
+            passwordError.textContent =
+                "Password must contain a special character";
+        }
+
+        else {
+            passwordError.style.color = "lightgreen";
+            passwordError.textContent = "Strong Password";
+        }
+
+    });
+    
+</script>
 </body>
 </html>
