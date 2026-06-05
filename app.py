@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import requests
 import urllib.parse
@@ -13,23 +14,18 @@ from nltk.tokenize import sent_tokenize, word_tokenize
 from nltk.tag import pos_tag
 from nltk.chunk import ne_chunk
 
-# Make sure NLTK directories are set and resources downloaded (handled in prep step)
-try:
-    nltk.data.find('tokenizers/punkt')
-except LookupError:
-    nltk.download('punkt', quiet=True)
-try:
-    nltk.data.find('taggers/averaged_perceptron_tagger')
-except LookupError:
-    nltk.download('averaged_perceptron_tagger', quiet=True)
-try:
-    nltk.data.find('chunkers/maxent_ne_chunker')
-except LookupError:
-    nltk.download('maxent_ne_chunker', quiet=True)
-try:
-    nltk.data.find('corpora/words')
-except LookupError:
-    nltk.download('words', quiet=True)
+# Make sure NLTK directories are set and resources downloaded (including new tabs/eng resources)
+for res in ['punkt', 'punkt_tab', 'averaged_perceptron_tagger', 'averaged_perceptron_tagger_eng', 'maxent_ne_chunker', 'maxent_ne_chunker_tab', 'words']:
+    try:
+        if res == 'punkt': nltk.data.find('tokenizers/punkt')
+        elif res == 'punkt_tab': nltk.data.find('tokenizers/punkt_tab')
+        elif res == 'averaged_perceptron_tagger': nltk.data.find('taggers/averaged_perceptron_tagger')
+        elif res == 'averaged_perceptron_tagger_eng': nltk.data.find('taggers/averaged_perceptron_tagger_eng')
+        elif res == 'maxent_ne_chunker': nltk.data.find('chunkers/maxent_ne_chunker')
+        elif res == 'maxent_ne_chunker_tab': nltk.data.find('chunkers/maxent_ne_chunker_tab')
+        elif res == 'words': nltk.data.find('corpora/words')
+    except LookupError:
+        nltk.download(res, quiet=True)
 
 app = Flask(__name__)
 CORS(app)
@@ -39,47 +35,26 @@ print("Loading SentenceTransformer model...")
 model = SentenceTransformer("all-MiniLM-L6-v2")
 print("Model loaded successfully.")
 
-# Predefined trusted sources scores
-TRUSTED_SOURCES = {
-    # Mainstream News Agencies & Publishers
-    "BBC News": 95,
-    "BBC": 95,
-    "Reuters": 100,
-    "Associated Press": 100,
-    "AP": 100,
-    "CNN": 85,
-    "NDTV": 80,
-    "The Hindu": 90,
-    "Times of India": 80,
-    "Indian Express": 85,
-    "Bloomberg": 95,
-    "NPR": 95,
-    "The New York Times": 95,
-    "NYT": 95,
-    "The Guardian": 90,
-    "Guardian": 90,
-    "Al Jazeera": 85,
-    "Wall Street Journal": 95,
-    "WSJ": 95,
-    # Fact-checking sites
-    "Snopes": 100,
-    "PolitiFact": 100,
-    "FactCheck.org": 100,
-    "Reuters Fact Check": 100,
-    "Lead Stories": 100,
-    "Full Fact": 100,
-    "Factly": 100
-}
-
+# Blacklisted/unreliable sources
 UNRELIABLE_SOURCES_SUBSTR = [
     "blog", "wordpress", "tumblr", "weebly", "wix", "forum", "reddit",
     "facebook.com", "twitter.com", "x.com", "tiktok.com", "instagram.com", 
     "youtube.com", "pinterest.com", "self-styled", "medium.com"
 ]
 
-# Negation and confirmation words for fact-check stance evaluation
+# Stance classification keywords
 NEGATION_WORDS = ["false", "fake", "misleading", "hoax", "debunked", "untrue", "incorrect", "pants on fire", "not true", "scam", "manipulated", "altered", "inaccurate"]
 CONFIRMATION_WORDS = ["true", "correct", "accurate", "verified", "authentic", "is true", "real", "legit"]
+
+# Refutation indicators in general news titles relative to claims
+REFUTATION_WORDS = [
+    "no cure", "not cure", "isn't", "is no", "fake", "false", "myth", "hoax", "debunk", 
+    "untrue", "incorrect", "misleading", "warns", "danger", "risk", "poison", "refutes", 
+    "unsubstantiated", "expose", "claims without evidence", "fabricated", "tragically", 
+    "toxic", "harmful", "death", "fatal", "hospitalized", "hospitalised", "advises against", 
+    "warning", "warn", "claims cure", "claimed cure", '"cure"', "'cure'", '"treatment"', "'treatment'",
+    "illness", "poses serious", "posing serious"
+]
 
 
 def extract_claims(text, gemini_key=None):
@@ -107,9 +82,7 @@ def extract_claims(text, gemini_key=None):
             if response.status_code == 200:
                 result_json = response.json()
                 text_response = result_json["candidates"][0]["content"]["parts"][0]["text"].strip()
-                # Clean potential markdown fences in the response
                 if text_response.startswith("```"):
-                    # remove markdown fences
                     lines = text_response.splitlines()
                     if lines[0].startswith("```"):
                         lines = lines[1:]
@@ -142,9 +115,9 @@ def extract_claims(text, gemini_key=None):
         words = word_tokenize(text)
         tagged = pos_tag(words)
         
-        # Keywords extraction: Nouns and Adjectives
-        keywords = [word for word, tag in tagged if tag in ('NN', 'NNS', 'NNP', 'NNPS', 'JJ') and len(word) > 2]
-        keywords = list(dict.fromkeys(keywords))[:10]  # remove duplicates preserving order
+        # Keywords extraction: Nouns, Adjectives, and specific foreign/unknown words
+        keywords = [word for word, tag in tagged if tag in ('NN', 'NNS', 'NNP', 'NNPS', 'JJ', 'FW') and len(word) >= 2]
+        keywords = list(dict.fromkeys(keywords))[:10]
         
         # Entity extraction using ne_chunk
         tree = ne_chunk(tagged)
@@ -155,10 +128,10 @@ def extract_claims(text, gemini_key=None):
         entities = list(dict.fromkeys(entities))[:5]
     except Exception as e:
         print("NLTK extraction error, basic fallback used:", e)
-        # Fallback to word splitting
         words_simple = [w.strip(',.?!":;()') for w in text.split()]
-        keywords = list(dict.fromkeys([w for w in words_simple if len(w) > 4]))[:10]
-        entities = list(dict.fromkeys([w for w in words_simple if w.istitle() and len(w) > 2]))[:5]
+        stopwords = {"is", "of", "the", "and", "or", "in", "on", "at", "to", "for", "with", "a", "an", "this", "that", "are", "was", "were", "been", "has", "have", "had", "be"}
+        keywords = list(dict.fromkeys([w for w in words_simple if len(w) >= 2 and w.lower() not in stopwords]))[:10]
+        entities = list(dict.fromkeys([w for w in words_simple if w.istitle() and len(w) >= 2]))[:5]
 
     return {
         "claims": claims,
@@ -173,7 +146,6 @@ def fetch_news_articles(query, api_key=None, limit=5):
     Fetches articles from NewsAPI or falls back to Google News RSS feed.
     """
     articles = []
-    # If NewsAPI key is provided and not the default placeholder
     if api_key and api_key != "YOUR_NEWS_API_KEY":
         url = (
             "https://newsapi.org/v2/everything?"
@@ -196,7 +168,6 @@ def fetch_news_articles(query, api_key=None, limit=5):
         except Exception as e:
             print("NewsAPI fetch error, falling back to RSS:", e)
 
-    # Fallback to Google News RSS (zero-config)
     return fetch_news_rss(query, limit)
 
 
@@ -244,7 +215,6 @@ def fetch_fact_checks(query, limit=5):
                 source_elem = item.find('source')
                 source = source_elem.text if source_elem is not None else "Fact-Check Site"
                 
-                # Normalize Snopes/Politifact sources
                 if "snopes" in link.lower(): source = "Snopes"
                 elif "politifact" in link.lower(): source = "PolitiFact"
                 elif "factcheck.org" in link.lower(): source = "FactCheck.org"
@@ -264,7 +234,7 @@ def fetch_fact_checks(query, limit=5):
 def calculate_similarities(claims, articles):
     """
     Step 3: Semantic Analysis (SBERT)
-    Compares extracted claims with article titles and returns maximum similarity scores.
+    Compares extracted claims with article titles and returns similarity scores.
     """
     if not articles or not claims:
         return []
@@ -276,8 +246,6 @@ def calculate_similarities(claims, articles):
         for article in articles:
             title = article["title"]
             title_embedding = model.encode(title, convert_to_tensor=True)
-            
-            # Compute cosine similarities between the article title and all extracted claims
             cos_scores = util.cos_sim(claim_embeddings, title_embedding)
             max_score = cos_scores.max().item()
             
@@ -285,12 +253,10 @@ def calculate_similarities(claims, articles):
             article_copy["similarity"] = round(max_score, 2)
             scored_articles.append(article_copy)
             
-        # Sort by similarity score descending
         scored_articles.sort(key=lambda x: x["similarity"], reverse=True)
         return scored_articles
     except Exception as e:
         print("Semantic similarity calculation error:", e)
-        # Fallback simple overlap score
         scored_articles = []
         for article in articles:
             article_copy = article.copy()
@@ -302,27 +268,65 @@ def calculate_similarities(claims, articles):
 def evaluate_credibility(articles):
     """
     Step 4: Credibility Evaluation
-    Assigns trust scores to sources and filters out unreliable domains.
+    Assigns trust scores to sources using precise word boundary regex matching and URL domains.
+    Default score for standard news publications aggregated by Google News is 70.
     """
     evaluated_articles = []
     for article in articles:
         source = article.get("source", "")
         link = article.get("link", "")
         
-        score = 45 # default score
+        score = 70 # Default standard score for aggregated news sources
+        source_lower = source.lower()
         
-        # Check predefined sources map
-        for key, val in TRUSTED_SOURCES.items():
-            if key.lower() in source.lower():
+        trusted_patterns = {
+            r"\breuters\b": 100,
+            r"\bassociated press\b": 100,
+            r"\bap\b": 100,
+            r"\bbbc\b": 95,
+            r"\bcnn\b": 85,
+            r"\bndtv\b": 80,
+            r"\bthe hindu\b": 90,
+            r"\btimes of india\b": 80,
+            r"\bindian express\b": 85,
+            r"\bbloomberg\b": 95,
+            r"\bnpr\b": 95,
+            r"\bnew york times\b": 95,
+            r"\bnyt\b": 95,
+            r"\bguardian\b": 90,
+            r"\bal jazeera\b": 85,
+            r"\bwall street journal\b": 95,
+            r"\bwsj\b": 95,
+            r"\bsnopes\b": 100,
+            r"\bpolitifact\b": 100,
+            r"\bfactcheck\b": 100,
+            r"\bhealthline\b": 85,
+            r"\bwebmd\b": 85,
+            r"\bmayo clinic\b": 95,
+            r"\bcdc\b": 100,
+            r"\bwho\b": 100,
+            r"\bcidrap\b": 90,
+            r"\blive science\b": 90,
+            r"\bars technica\b": 90,
+            r"\bsciencedaily\b": 90,
+            r"\bscientific american\b": 95,
+            r"\bforbes\b": 85,
+            r"\btime\b": 90,
+            r"\bnewsweek\b": 80,
+            r"\bu\.s\. news\b": 85,
+            r"\busa today\b": 85,
+            r"\bwashington post\b": 95,
+        }
+        
+        for pattern, val in trusted_patterns.items():
+            if re.search(pattern, source_lower):
                 score = val
                 break
                 
-        # Parse URL for more precise evaluations
         if link:
             try:
                 domain = urllib.parse.urlparse(link).netloc.lower()
                 
-                # Check for major fact-check domains
                 if any(x in domain for x in ["snopes.com", "politifact.com", "factcheck.org"]):
                     score = 100
                 elif "reuters.com" in domain:
@@ -331,8 +335,13 @@ def evaluate_credibility(articles):
                     score = 95
                 elif any(x in domain for x in ["theguardian.com", "npr.org", "aljazeera.com"]):
                     score = 90
+                elif any(x in domain for x in ["livescience.com", "arstechnica.com", "sciencedaily.com"]):
+                    score = 90
+                elif "healthline.com" in domain:
+                    score = 85
+                elif "forbes.com" in domain:
+                    score = 85
                 
-                # Apply penalty for unreliable domains
                 for substr in UNRELIABLE_SOURCES_SUBSTR:
                     if substr in domain:
                         score = 15
@@ -340,9 +349,8 @@ def evaluate_credibility(articles):
             except Exception:
                 pass
                 
-        # Apply penalty based on source name directly
         for substr in UNRELIABLE_SOURCES_SUBSTR:
-            if substr in source.lower():
+            if substr in source_lower:
                 score = 15
                 break
                 
@@ -353,8 +361,22 @@ def evaluate_credibility(articles):
     return evaluated_articles
 
 
-def analyze_factcheck_stance(title):
-    """Helper: Analyzes the stance of a fact-checking article's title."""
+def check_refutation(claim, article_title):
+    """
+    Checks if the article title contains indicators refuting the core claim.
+    Normalizes smart quotes before checking.
+    """
+    title_lower = article_title.lower()
+    title_norm = title_lower.replace('“', '"').replace('”', '"').replace('‘', "'").replace('’', "'")
+    
+    for word in REFUTATION_WORDS:
+        if word in title_norm:
+            return True
+    return False
+
+
+def get_factcheck_stance(title):
+    """Analyzes fact-check title for explicit stance. Returns 'FALSE', 'VERIFIED', or None."""
     title_lower = title.lower()
     for word in NEGATION_WORDS:
         if word in title_lower:
@@ -362,14 +384,14 @@ def analyze_factcheck_stance(title):
     for word in CONFIRMATION_WORDS:
         if word in title_lower:
             return "VERIFIED"
-    # Fact-checking sites generally cover false claims, so default stance is False
-    return "FALSE"
+    return None
 
 
-def classify_verdict(news_list, factcheck_list):
+def classify_verdict(news_list, factcheck_list, claims):
     """
     Step 5: Decision Engine
     Combines news similarity, source credibility, and fact-checking results.
+    Integrates negation checks and contradiction logic.
     """
     best_news = news_list[0] if news_list else None
     best_fc = factcheck_list[0] if factcheck_list else None
@@ -380,68 +402,135 @@ def classify_verdict(news_list, factcheck_list):
     max_fc_sim = best_fc["similarity"] if best_fc else 0.0
     fc_credibility = best_fc["credibility"] if best_fc else 100
     
+    primary_claim = claims[0] if claims else ""
+    
     label = "UNVERIFIED"
     confidence = 0.50
     explanation = ""
     
-    # Decision Pipeline:
-    # 1. Fact-check confirmation has highest priority
-    if max_fc_sim >= 0.65 and best_fc:
-        stance = analyze_factcheck_stance(best_fc["title"])
-        if stance == "FALSE":
+    # 1. Fact-check stance mapping
+    fc_stance = None
+    if best_fc:
+        fc_stance = get_factcheck_stance(best_fc["title"])
+        
+    # Evaluate fact-check trigger conditions:
+    # - Similarity is high (>= 0.70)
+    # - Or similarity is moderate (>= 0.55) AND we have an explicit stance (negation or confirmation match)
+    trigger_fc = False
+    if best_fc:
+        if max_fc_sim >= 0.70:
+            trigger_fc = True
+            if not fc_stance:
+                fc_stance = "FALSE" # Default high-similarity fact-check to False
+        elif max_fc_sim >= 0.55 and fc_stance is not None:
+            trigger_fc = True
+
+    # 2. Decision Pipeline
+    # A. Fact-Check trigger has top priority
+    if trigger_fc and best_fc:
+        if fc_stance == "FALSE":
             label = "FALSE"
-            confidence = round((0.6 * max_fc_sim) + (0.4 * (fc_credibility / 100)), 2)
+            confidence = round((0.65 * max_fc_sim) + (0.35 * (fc_credibility / 100)), 2)
             explanation = (
-                f"This claim is classified as FALSE. A highly matching fact-check article "
-                f"from '{best_fc['source']}' ('{best_fc['title']}') directly debunks or corrects this claim "
+                f"This claim is classified as FALSE. A highly relevant fact-checking article "
+                f"from '{best_fc['source']}' ('{best_fc['title']}') debunks or refutes this claim "
                 f"(semantic similarity: {int(max_fc_sim * 100)}%)."
             )
         else: # VERIFIED
             label = "VERIFIED"
-            confidence = round((0.6 * max_fc_sim) + (0.4 * (fc_credibility / 100)), 2)
+            confidence = round((0.65 * max_fc_sim) + (0.35 * (fc_credibility / 100)), 2)
             explanation = (
-                f"This claim is classified as VERIFIED. An official fact-checking article "
+                f"This claim is classified as VERIFIED. An official fact-checking report "
                 f"from '{best_fc['source']}' ('{best_fc['title']}') confirms this claim as accurate "
                 f"(semantic similarity: {int(max_fc_sim * 100)}%)."
             )
             
-    # 2. Mainstream News Verification
-    else:
-        if max_news_sim >= 0.70:
-            if news_credibility >= 70:
-                label = "VERIFIED"
-                confidence = round((0.6 * max_news_sim) + (0.4 * (news_credibility / 100)), 2)
-                explanation = (
-                    f"This claim is classified as VERIFIED. It closely aligns with reports from credible mainstream "
-                    f"news organizations like '{best_news['source']}' ('{best_news['title']}') "
-                    f"(semantic similarity: {int(max_news_sim * 100)}%, source credibility: {news_credibility}/100)."
-                )
-            else:
-                label = "UNVERIFIED"
-                confidence = round((0.5 * max_news_sim) + (0.5 * (news_credibility / 100)), 2)
-                explanation = (
-                    f"This claim is classified as UNVERIFIED. Although related reports were found on '{best_news['source']}' "
-                    f"('{best_news['title']}'), the source fails to meet our credibility standards "
-                    f"(source credibility: {news_credibility}/100)."
-                )
-        elif max_news_sim < 0.40:
-            # Low news similarity and no fact check means the claim lacks any reporting.
-            # If presented as news but absent from all mainstream feeds, it is likely false.
+    # B. High Mainstream News Verification & Contradiction/Refutation Rule
+    elif best_news and max_news_sim >= 0.70:
+        is_refuted = check_refutation(primary_claim, best_news["title"])
+        
+        if is_refuted:
             label = "FALSE"
-            # Cap confidence to avoid high false positives when no fact-check exists
-            confidence = min(0.70, round(1.0 - max_news_sim, 2))
+            confidence = round((0.6 * max_news_sim) + (0.4 * (news_credibility / 100)), 2)
             explanation = (
-                f"This claim is classified as FALSE due to a complete absence of corroborating evidence. "
-                f"No related articles or fact-checks were found across trusted mainstream news organizations "
+                f"This claim is classified as FALSE. Highly similar reports from credible news organizations "
+                f"like '{best_news['source']}' ('{best_news['title']}') directly refute or warn against "
+                f"this information (semantic similarity: {int(max_news_sim * 100)}%, source credibility: {news_credibility}/100)."
+            )
+        elif news_credibility >= 65:
+            label = "VERIFIED"
+            confidence = round((0.6 * max_news_sim) + (0.4 * (news_credibility / 100)), 2)
+            explanation = (
+                f"This claim is classified as VERIFIED. It closely aligns with reporting from credible mainstream "
+                f"news organizations like '{best_news['source']}' ('{best_news['title']}') "
+                f"(semantic similarity: {int(max_news_sim * 100)}%, source credibility: {news_credibility}/100)."
+            )
+        else:
+            label = "UNVERIFIED"
+            confidence = round((0.5 * max_news_sim) + (0.5 * (news_credibility / 100)), 2)
+            explanation = (
+                f"This claim is classified as UNVERIFIED. Although related reports were found on '{best_news['source']}' "
+                f"('{best_news['title']}'), the source is not recognized as a highly trusted organization "
+                f"(source credibility: {news_credibility}/100)."
+            )
+            
+    # C. Fallback: Scan ALL retrieved news for validation (checks moderate similarity + high credibility)
+    # E.g. "Narendra modi is pm of india" matches titles referencing "PM Modi" (similarity ~0.56 but source is BBC/Times of India)
+    # Or James Webb launch matches active telescope reports.
+    else:
+        # Search the entire news list for verification matches
+        verified_match = None
+        refuted_match = None
+        
+        for art in news_list:
+            sim = art["similarity"]
+            cred = art["credibility"]
+            title = art["title"]
+            
+            # Check refutation first
+            if sim >= 0.60 and check_refutation(primary_claim, title):
+                refuted_match = art
+                break
+            
+            # Fallback verification conditions:
+            # - Similarity >= 0.50 with very high trust source (>= 80)
+            # - Or Similarity >= 0.55 with standard trust source (>= 70)
+            if (sim >= 0.50 and cred >= 80) or (sim >= 0.55 and cred >= 70):
+                verified_match = art
+                break
+                
+        if refuted_match:
+            label = "FALSE"
+            confidence = round((0.6 * refuted_match["similarity"]) + (0.4 * (refuted_match["credibility"] / 100)), 2)
+            explanation = (
+                f"This claim is classified as FALSE. Similar reports from credible news organizations "
+                f"like '{refuted_match['source']}' ('{refuted_match['title']}') directly refute or warn against "
+                f"this information (semantic similarity: {int(refuted_match['similarity'] * 100)}%, source credibility: {refuted_match['credibility']}/100)."
+            )
+        elif verified_match:
+            label = "VERIFIED"
+            confidence = round((0.55 * verified_match["similarity"]) + (0.45 * (verified_match["credibility"] / 100)), 2)
+            explanation = (
+                f"This claim is classified as VERIFIED based on reporting from credible sources. "
+                f"Although semantic similarity is moderate ({int(verified_match['similarity'] * 100)}%), the source '{verified_match['source']}' "
+                f"('{verified_match['title']}') is trusted (credibility: {verified_match['credibility']}/100) and refers to the subject in a manner validating the claim."
+            )
+        elif max_news_sim < 0.40 and max_fc_sim < 0.40:
+            # Complete Lack of News Coverage (Implicitly false)
+            label = "FALSE"
+            confidence = min(0.70, round(1.0 - max(max_news_sim, max_fc_sim), 2))
+            explanation = (
+                f"This claim is classified as FALSE due to a complete lack of corroborating evidence. "
+                f"No related articles or official fact-checks were found across trusted mainstream news organizations "
                 f"or verified fact-checking platforms."
             )
         else:
-            # Moderate similarity (0.40 - 0.70)
+            # Moderate similarity or mixed evidence
             label = "UNVERIFIED"
             confidence = 0.50
             explanation = (
                 f"This claim is classified as UNVERIFIED. The semantic alignment with current news reports is moderate "
-                f"(maximum news similarity: {int(max_news_sim * 100)}%), which is insufficient to verify or debunk it with confidence."
+                f"(maximum similarity: {int(max_news_sim * 100)}%), which is insufficient to verify or debunk it with confidence."
             )
             
     return label, confidence, explanation
@@ -456,15 +545,12 @@ def analyze_news():
         if not news_text or news_text.strip() == "":
             return jsonify({"error": "News text is required"}), 400
             
-        # Extract API keys from custom headers or use local environment variables
         gemini_key = request.headers.get("X-Gemini-API-Key") or os.environ.get("GEMINI_API_KEY")
         news_key = request.headers.get("X-News-API-Key") or os.environ.get("NEWS_API_KEY")
         
         # Step 1: Claim Extraction (AI)
         extracted = extract_claims(news_text, gemini_key)
         
-        # Determine query for data retrieval
-        # Try joining first 3-4 keywords, otherwise use the first claim, otherwise the whole text
         keywords = extracted.get("keywords", [])
         claims = extracted.get("claims", [news_text])
         entities = extracted.get("entities", [])
@@ -486,9 +572,8 @@ def analyze_news():
         scored_factchecks = evaluate_credibility(scored_factchecks)
         
         # Step 5 & 6: Decision Engine & Verdict Classification
-        label, confidence, explanation = classify_verdict(scored_news, scored_factchecks)
+        label, confidence, explanation = classify_verdict(scored_news, scored_factchecks, claims)
         
-        # Return complete analysis report
         return jsonify({
             "label": label,
             "confidence": confidence,
