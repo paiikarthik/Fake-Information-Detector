@@ -56,6 +56,13 @@ REFUTATION_WORDS = [
     "illness", "poses serious", "posing serious"
 ]
 
+# Critical event state categories to prevent false-positive verifications
+CRITICAL_STATES = {
+    "death": ["died", "death", "dead", "killed", "passed away", "passes away", "passing away", "murdered", "assassinated", "fatal", "kills", "kill", "suicide", "demise", "obituary", "funeral", "expires", "murder"],
+    "arrest": ["arrested", "arrest", "jailed", "jail", "imprisoned", "custody", "detained", "charges", "indicted", "police custody", "arrests", "fir"],
+    "resignation": ["resigned", "resignation", "quits", "quit", "steps down", "stepping down", "resign"]
+}
+
 
 def extract_claims(text, gemini_key=None):
     """
@@ -145,7 +152,6 @@ def fetch_news_articles(query, api_key=None, limit=5):
     Step 2: Data Retrieval - Related News
     Fetches articles from NewsAPI or falls back to Google News RSS feed.
     """
-    articles = []
     if api_key and api_key != "YOUR_NEWS_API_KEY":
         url = (
             "https://newsapi.org/v2/everything?"
@@ -158,13 +164,14 @@ def fetch_news_articles(query, api_key=None, limit=5):
             response = requests.get(url, timeout=8)
             if response.status_code == 200:
                 data = response.json()
+                articles = []
                 for article in data.get("articles", []):
                     articles.append({
                         "title": article.get("title", ""),
                         "link": article.get("url", ""),
                         "source": article.get("source", {}).get("name", "NewsAPI Source")
                     })
-                return articles
+                return articles, False
         except Exception as e:
             print("NewsAPI fetch error, falling back to RSS:", e)
 
@@ -190,10 +197,10 @@ def fetch_news_rss(query, limit=5):
                     "link": link,
                     "source": source
                 })
-            return articles
+            return articles, False
     except Exception as e:
         print("Google News RSS fetch error:", e)
-    return []
+    return [], True
 
 
 def fetch_fact_checks(query, limit=5):
@@ -225,10 +232,10 @@ def fetch_fact_checks(query, limit=5):
                     "link": link,
                     "source": source
                 })
-            return articles
+            return articles, False
     except Exception as e:
         print("Fact Check RSS fetch error:", e)
-    return []
+    return [], True
 
 
 def calculate_similarities(claims, articles):
@@ -361,6 +368,33 @@ def evaluate_credibility(articles):
     return evaluated_articles
 
 
+def verify_critical_states(claim, title):
+    """
+    Enforces matching event flags (death, arrest, resignation) between claim and news headers.
+    Ensures that if a claim asserts a person died or was arrested, the verified news headline
+    corroborates this state, avoiding false-positive semantic matches.
+    """
+    claim_lower = claim.lower()
+    title_norm = title.lower().replace('“', '"').replace('”', '"').replace('‘', "'").replace('’', "'")
+    
+    for state, keywords in CRITICAL_STATES.items():
+        has_claim_state = False
+        for kw in keywords:
+            if re.search(r"\b" + re.escape(kw) + r"\b", claim_lower):
+                has_claim_state = True
+                break
+                
+        if has_claim_state:
+            has_title_state = False
+            for kw in keywords:
+                if re.search(r"\b" + re.escape(kw) + r"\b", title_norm):
+                    has_title_state = True
+                    break
+            if not has_title_state:
+                return False
+    return True
+
+
 def check_refutation(claim, article_title):
     """
     Checks if the article title contains indicators refuting the core claim.
@@ -387,7 +421,7 @@ def get_factcheck_stance(title):
     return None
 
 
-def classify_verdict(news_list, factcheck_list, claims):
+def classify_verdict(news_list, factcheck_list, claims, fetch_error=False):
     """
     Step 5: Decision Engine
     Combines news similarity, source credibility, and fact-checking results.
@@ -448,6 +482,7 @@ def classify_verdict(news_list, factcheck_list, claims):
     # B. High Mainstream News Verification & Contradiction/Refutation Rule
     elif best_news and max_news_sim >= 0.70:
         is_refuted = check_refutation(primary_claim, best_news["title"])
+        states_aligned = verify_critical_states(primary_claim, best_news["title"])
         
         if is_refuted:
             label = "FALSE"
@@ -457,7 +492,7 @@ def classify_verdict(news_list, factcheck_list, claims):
                 f"like '{best_news['source']}' ('{best_news['title']}') directly refute or warn against "
                 f"this information (semantic similarity: {int(max_news_sim * 100)}%, source credibility: {news_credibility}/100)."
             )
-        elif news_credibility >= 65:
+        elif states_aligned and news_credibility >= 65:
             label = "VERIFIED"
             confidence = round((0.6 * max_news_sim) + (0.4 * (news_credibility / 100)), 2)
             explanation = (
@@ -470,15 +505,12 @@ def classify_verdict(news_list, factcheck_list, claims):
             confidence = round((0.5 * max_news_sim) + (0.5 * (news_credibility / 100)), 2)
             explanation = (
                 f"This claim is classified as UNVERIFIED. Although related reports were found on '{best_news['source']}' "
-                f"('{best_news['title']}'), the source is not recognized as a highly trusted organization "
+                f"('{best_news['title']}'), they lack critical alignment or the source is not recognized as highly trusted "
                 f"(source credibility: {news_credibility}/100)."
             )
             
     # C. Fallback: Scan ALL retrieved news for validation (checks moderate similarity + high credibility)
-    # E.g. "Narendra modi is pm of india" matches titles referencing "PM Modi" (similarity ~0.56 but source is BBC/Times of India)
-    # Or James Webb launch matches active telescope reports.
     else:
-        # Search the entire news list for verification matches
         verified_match = None
         refuted_match = None
         
@@ -496,8 +528,10 @@ def classify_verdict(news_list, factcheck_list, claims):
             # - Similarity >= 0.50 with very high trust source (>= 80)
             # - Or Similarity >= 0.55 with standard trust source (>= 70)
             if (sim >= 0.50 and cred >= 80) or (sim >= 0.55 and cred >= 70):
-                verified_match = art
-                break
+                # Enforce critical state alignment
+                if verify_critical_states(primary_claim, title):
+                    verified_match = art
+                    break
                 
         if refuted_match:
             label = "FALSE"
@@ -516,14 +550,21 @@ def classify_verdict(news_list, factcheck_list, claims):
                 f"('{verified_match['title']}') is trusted (credibility: {verified_match['credibility']}/100) and refers to the subject in a manner validating the claim."
             )
         elif max_news_sim < 0.40 and max_fc_sim < 0.40:
-            # Complete Lack of News Coverage (Implicitly false)
-            label = "FALSE"
-            confidence = min(0.70, round(1.0 - max(max_news_sim, max_fc_sim), 2))
-            explanation = (
-                f"This claim is classified as FALSE due to a complete lack of corroborating evidence. "
-                f"No related articles or official fact-checks were found across trusted mainstream news organizations "
-                f"or verified fact-checking platforms."
-            )
+            if fetch_error:
+                label = "UNVERIFIED"
+                confidence = 0.50
+                explanation = (
+                    "Unable to retrieve search verification data due to a temporary connection timeout "
+                    "with the news aggregates. Please try verifying again in a moment."
+                )
+            else:
+                label = "FALSE"
+                confidence = min(0.70, round(1.0 - max(max_news_sim, max_fc_sim), 2))
+                explanation = (
+                    f"This claim is classified as FALSE due to a complete lack of corroborating evidence. "
+                    f"No related articles or official fact-checks were found across trusted mainstream news organizations "
+                    f"or verified fact-checking platforms."
+                )
         else:
             # Moderate similarity or mixed evidence
             label = "UNVERIFIED"
@@ -560,8 +601,9 @@ def analyze_news():
             search_query = news_text[:80]
             
         # Step 2: Data Retrieval
-        news_articles = fetch_news_articles(search_query, news_key, limit=6)
-        factcheck_articles = fetch_fact_checks(search_query, limit=5)
+        news_articles, news_err = fetch_news_articles(search_query, news_key, limit=6)
+        factcheck_articles, fc_err = fetch_fact_checks(search_query, limit=5)
+        fetch_err = news_err or fc_err
         
         # Step 3: Semantic Analysis (SBERT)
         scored_news = calculate_similarities(claims, news_articles)
@@ -572,7 +614,7 @@ def analyze_news():
         scored_factchecks = evaluate_credibility(scored_factchecks)
         
         # Step 5 & 6: Decision Engine & Verdict Classification
-        label, confidence, explanation = classify_verdict(scored_news, scored_factchecks, claims)
+        label, confidence, explanation = classify_verdict(scored_news, scored_factchecks, claims, fetch_err)
         
         return jsonify({
             "label": label,
