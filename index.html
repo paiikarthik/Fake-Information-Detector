@@ -792,6 +792,16 @@
                 text-align: center;
             }
         }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .tex{
+            text-align: end;
+        }
     </style>
 </head>
 <body>
@@ -802,6 +812,9 @@
             <i class="fa-solid fa-shield-halved"></i> FakeXpose AI
         </div>
         <div class="nav-links">
+            <div class="tex">
+               <h4>How it Works? </h4>
+            </div>
             <button id="config-btn" class="secondary-btn" onclick="openModal()">
                 <i class="fa-solid fa-sliders"></i> Configuration
             </button>
@@ -810,9 +823,11 @@
 
     <!-- TITLE -->
     <div class="main-title">
-        <h1>A FAKE INFORMATION DETECTOR</h1>
+        <h1>FAKE INFORMATION DETECTOR</h1>
         <p>Find, Verify and Detect Fake Information..</p>
     </div>
+
+    
 
     <!-- MAIN BOX -->
     <div class="container">
