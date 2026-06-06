@@ -76,30 +76,19 @@
             font-size: 15px;
         }
 
-         .forms input[type="email"], 
-         .forms input[type="text"]{
-            width: 100%;
-            padding: 10px;
-            margin-top: 8px;
-            margin-bottom: 18px;
+.forms input[type="email"],
+.forms input[type="text"],
+.forms input[type="password"]{
+    width:100%;
+    padding:10px;
+    margin-top:8px;
+    margin-bottom:2px; 
+    border:none;
+    border-radius:8px;
+    background:#f1f1f1;
+    font-size:14px;
+}
 
-            border: none;
-            border-radius: 8px;
-
-            background: #f1f1f1;
-            font-size: 14px;
-        }
-
-        .forms input[type="password"]
-        {
-            width: 100%;
-            padding: 10px;
-            margin-top: 8px;
-            border: none;
-            border-radius: 8px;
-            background: #f1f1f1;
-            font-size: 14px; 
-        }
 
         .forms input[type="submit"]{
             width: 100%;
@@ -122,7 +111,7 @@
             background: #ffcc70;
         }
 
-        .google-btn{
+.google-btn{
     width:100%;
     padding:10px;
     margin-top:10px;
@@ -136,6 +125,14 @@
 
 .google-btn:hover{
     background:#f1f1f1;
+}
+.error {
+    display: block;
+    color: red;
+    min-height: 14px;
+    font-size: 12px;
+    margin-top: 2px;
+    margin-bottom: 4px;
 }
     </style>
 </head>
@@ -159,14 +156,16 @@
           <h2>Create Account Now</h2>
         <form action="">
 
-            <label for="name">Enter Your Name</label>
-            <input type="text" name="name" id="name"><br><br>
+           <label for="name">Enter Your Name</label>
+<input type="text" name="name" id="name">
+<small id="nameError" class="error"></small>
 
-            <label for="name">Enter Email ID</label>
-            <input type="email" name="email" id="email" required><br><br>
-
-            <label for="password">Enter Your password</label>
-            <input type="password" name="password" id="password"><br><br><br>
+<label for="email">Enter Email ID</label>
+<input type="email" name="email" id="email" required>
+<small id="emailError" class="error"></small>
+<label for="password">Enter Your Password</label>
+<input type="password" name="password" id="password">
+<small id="passwordError" class="error"></small>
          <input type="submit" value="submit" id="submit">
          <button type="button" id="googleSignIn" class="google-btn">
     <i class="fa-brands fa-google"></i> Sign in with Google
@@ -183,19 +182,11 @@
     let passwordInput = document.getElementById("password");
 
     // Error message elements
-    let nameError = document.createElement("small");
-    let emailError = document.createElement("small");
-    let passwordError = document.createElement("small");
-
-    nameError.style.color = "red";
-    emailError.style.color = "red";
-    passwordError.style.color = "red";
-
+    let nameError = document.getElementById("nameError");
+let emailError = document.getElementById("emailError");
+let passwordError = document.getElementById("passwordError");
    
-    nameInput.after(nameError);
-    emailInput.after(emailError);
-    passwordInput.after(passwordError);
-
+   
    
     nameInput.addEventListener("input", function () {
 
