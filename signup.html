@@ -121,6 +121,22 @@
           .forms input[type="submit"]:hover{
             background: #ffcc70;
         }
+
+        .google-btn{
+    width:100%;
+    padding:10px;
+    margin-top:10px;
+    border:none;
+    border-radius:8px;
+    background:white;
+    color:black;
+    font-size:16px;
+    cursor:pointer;
+}
+
+.google-btn:hover{
+    background:#f1f1f1;
+}
     </style>
 </head>
 <body>
@@ -152,6 +168,9 @@
             <label for="password">Enter Your password</label>
             <input type="password" name="password" id="password"><br><br><br>
          <input type="submit" value="submit" id="submit">
+         <button type="button" id="googleSignIn" class="google-btn">
+    <i class="fa-brands fa-google"></i> Sign in with Google
+</button>
             <p>Already Have an Account? <a href="Login.html"> Login Now</a></p>
         </form>
     </div>
@@ -270,9 +289,10 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/fireba
 
 import {
   getAuth,
-  createUserWithEmailAndPassword
+  createUserWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithPopup
 } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
-
 
 // Firebase Config
 const firebaseConfig = {
@@ -325,7 +345,37 @@ window.location.href = "index.html";
     }
 
 });
+const googleBtn = document.getElementById("googleSignIn");
 
+googleBtn.addEventListener("click", async () => {
+
+    const provider = new GoogleAuthProvider();
+
+    try {
+
+        const result = await signInWithPopup(
+            auth,
+            provider
+        );
+
+        const user = result.user;
+
+        console.log("Name:", user.displayName);
+        console.log("Email:", user.email);
+
+        alert("Google Login Successful");
+
+        window.location.href = "index.html";
+
+    }
+    catch(error){
+
+        console.error(error);
+        alert(error.message);
+
+    }
+
+});
 </script>
 </body>
 </html>
