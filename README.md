@@ -1,6 +1,6 @@
 # Fake Information Detector
 
-Fake Information Detector Checks Whether the Given Information Is Real or Fake. It extracts the claim, searches news and fact-check sources, compares meaning with semantic similarity, scores source credibility, and then returns a verdict with confidence.
+Fake Information Detector is a MCA Mini Project which Checks Whether the Given Information Is Real or Fake. It extracts the claim, searches news and fact-check sources, compares meaning with semantic similarity, scores source credibility, and then returns a verdict with confidence.
 
 
 ## Project Flow
