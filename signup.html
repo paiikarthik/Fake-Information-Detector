@@ -282,7 +282,8 @@ import {
   getAuth,
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  updateProfile
 } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
 
 // Firebase Config
@@ -309,6 +310,7 @@ form.addEventListener("submit", async function(event){
 
     event.preventDefault();
 
+    const name = document.getElementById("name").value.trim();
     const email = document.getElementById("email").value;
     const password = document.getElementById("password").value;
 
@@ -321,7 +323,13 @@ form.addEventListener("submit", async function(event){
             password
         );
 
-window.location.href = "index.html";
+        await updateProfile(userCredential.user, {
+            displayName: name || email.split("@")[0]
+        });
+
+        localStorage.setItem("loggedInUserName", name || email.split("@")[0]);
+
+        window.location.href = "index.html";
 
         console.log(userCredential.user);
 
@@ -353,6 +361,11 @@ googleBtn.addEventListener("click", async () => {
 
         console.log("Name:", user.displayName);
         console.log("Email:", user.email);
+
+        localStorage.setItem(
+            "loggedInUserName",
+            user.displayName || (user.email ? user.email.split("@")[0] : "User")
+        );
 
         alert("Google Login Successful");
 

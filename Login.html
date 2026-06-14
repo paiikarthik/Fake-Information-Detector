@@ -245,6 +245,11 @@ form.addEventListener("submit", async(e)=>{
 
         console.log("Logged in:",user.email);
 
+        localStorage.setItem(
+            "loggedInUserName",
+            user.displayName || (user.email ? user.email.split("@")[0] : "User")
+        );
+
 
         alert("Login Successful");
 
@@ -313,6 +318,11 @@ googleBtn.addEventListener("click",async()=>{
             "Google User:",
             user.displayName,
             user.email
+        );
+
+        localStorage.setItem(
+            "loggedInUserName",
+            user.displayName || (user.email ? user.email.split("@")[0] : "User")
         );
 
 

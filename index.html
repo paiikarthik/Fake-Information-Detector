@@ -797,6 +797,51 @@
             display: flex;
             align-items: center;
             gap: 1rem;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .auth-area {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            min-height: 44px;
+        }
+
+        .user-chip {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            max-width: 240px;
+            padding: 9px 14px;
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.04);
+            color: white;
+            font-weight: 700;
+        }
+
+        .user-chip span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .auth-link {
+            color: white;
+            font-weight: 700;
+            text-decoration: none;
+            padding: 10px 12px;
+            border-radius: 10px;
+            transition: background 0.2s ease;
+        }
+
+        .auth-link:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        #logout-btn {
+            display: none;
         }
 
         .tex{
@@ -818,6 +863,17 @@
             <button id="config-btn" class="secondary-btn" onclick="openModal()">
                 <i class="fa-solid fa-sliders"></i> Configuration
             </button>
+            <div class="auth-area">
+                <div id="user-chip" class="user-chip">
+                    <i class="fa-solid fa-circle-user"></i>
+                    <span id="user-name"></span>
+                </div>
+                <a id="login-link" class="auth-link" href="Login.html">Login</a>
+                <a id="signup-link" class="auth-link" href="signup.html">Signup</a>
+                <button id="logout-btn" class="secondary-btn" type="button">
+                    <i class="fa-solid fa-right-from-bracket"></i> Logout
+                </button>
+            </div>
         </div>
     </nav>
 
@@ -986,6 +1042,60 @@
     </footer>
 
     <!-- SCRIPT -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
+        import {
+            getAuth,
+            onAuthStateChanged,
+            signOut
+        } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDL_fcHMqPF26LrcaDgy6BSTSDx3iWT-XE",
+            authDomain: "fake-news-detection-f9154.firebaseapp.com",
+            projectId: "fake-news-detection-f9154",
+            storageBucket: "fake-news-detection-f9154.firebasestorage.app",
+            messagingSenderId: "327331005701",
+            appId: "1:327331005701:web:1c80a10522f4251d10636c"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        const userChip = document.getElementById("user-chip");
+        const userName = document.getElementById("user-name");
+        const loginLink = document.getElementById("login-link");
+        const signupLink = document.getElementById("signup-link");
+        const logoutBtn = document.getElementById("logout-btn");
+
+        function getDisplayName(user) {
+            return user.displayName || localStorage.getItem("loggedInUserName") || (user.email ? user.email.split("@")[0] : "User");
+        }
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                userName.textContent = getDisplayName(user);
+                userChip.style.display = "inline-flex";
+                logoutBtn.style.display = "inline-flex";
+                loginLink.style.display = "none";
+                signupLink.style.display = "none";
+            } else {
+                userName.textContent = "";
+                userChip.style.display = "none";
+                logoutBtn.style.display = "none";
+                loginLink.style.display = "inline-flex";
+                signupLink.style.display = "inline-flex";
+                localStorage.removeItem("loggedInUserName");
+            }
+        });
+
+        logoutBtn.addEventListener("click", async () => {
+            await signOut(auth);
+            localStorage.removeItem("loggedInUserName");
+            window.location.href = "Login.html";
+        });
+    </script>
+
     <script>
         // Tab switching logic
         function switchTab(evt, tabId) {
