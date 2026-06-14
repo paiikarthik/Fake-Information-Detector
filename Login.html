@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login Now</title>
+    <link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         body{
            margin: 0;
@@ -26,7 +28,21 @@
             font-family: monospace;
         }
 
+        .google-btn{
+    width:100%;
+    padding:10px;
+    margin-top:10px;
+    border:none;
+    border-radius:8px;
+    background:white;
+    color:black;
+    font-size:16px;
+    cursor:pointer;
+}
 
+.google-btn:hover{
+    background:#f1f1f1;
+}
         #navig ul{
             display: flex;
             gap: 20px;
@@ -146,29 +162,183 @@
             <p>Forgot password? <a href="passreset"> Click Here</a></p><br>
 
             <input type="submit" value="submit">
+            <button type="button" id="googleSignIn" class="google-btn">
+            <i class="fa-brands fa-google"></i> Login with Google
+            </button>
+
             <p>Don't Have an Account? <a href="signup.html"> Signup Now</a></p>
         </form>
     </div>
 </div>
-
 <script type="module">
-  // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
 
-  // Your web app's Firebase configuration
-  const firebaseConfig = {
+import { initializeApp } 
+from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
+
+
+import {
+    getAuth,
+    signInWithEmailAndPassword,
+    GoogleAuthProvider,
+    signInWithPopup
+}
+from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
+
+
+// Firebase Configuration
+
+const firebaseConfig = {
+
     apiKey: "AIzaSyDL_fcHMqPF26LrcaDgy6BSTSDx3iWT-XE",
-    authDomain: "fake-news-detection-f9154.firebaseapp.com",
-    projectId: "fake-news-detection-f9154",
-    storageBucket: "fake-news-detection-f9154.firebasestorage.app",
-    messagingSenderId: "327331005701",
-    appId: "1:327331005701:web:1c80a10522f4251d10636c"
-  };
 
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
+    authDomain: "fake-news-detection-f9154.firebaseapp.com",
+
+    projectId: "fake-news-detection-f9154",
+
+    storageBucket: "fake-news-detection-f9154.firebasestorage.app",
+
+    messagingSenderId: "327331005701",
+
+    appId: "1:327331005701:web:1c80a10522f4251d10636c"
+
+};
+
+
+//  Firebase
+
+const app = initializeApp(firebaseConfig);
+
+
+const auth = getAuth(app);
+
+//Email Pass Login
+
+const form = document.querySelector("form");
+
+
+form.addEventListener("submit", async(e)=>{
+
+    e.preventDefault();
+
+
+    const email =
+    document.getElementById("name").value;
+
+
+    const password =
+    document.getElementById("password").value;
+
+
+
+    try{
+
+        const userCredential =
+        await signInWithEmailAndPassword(
+            auth,
+            email,
+            password
+        );
+
+
+        const user=userCredential.user;
+
+
+        console.log("Logged in:",user.email);
+
+
+        alert("Login Successful");
+
+
+        window.location.href="index.html";
+
+
+    }
+
+    catch(error){
+
+
+        console.log(error);
+
+
+        if(error.code==="auth/invalid-credential")
+        {
+            alert("Invalid Email or Password");
+        }
+
+        else if(error.code==="auth/user-not-found")
+        {
+            alert("Account does not exist. Please signup");
+        }
+
+        else
+        {
+            alert(error.message);
+        }
+
+    }
+
+
+});
+
+
+//Login With Google
+
+const googleBtn =
+document.getElementById("googleSignIn");
+
+
+
+googleBtn.addEventListener("click",async()=>{
+
+
+    const provider =
+    new GoogleAuthProvider();
+
+
+
+    try{
+
+
+        const result =
+        await signInWithPopup(
+            auth,
+            provider
+        );
+
+
+        const user=result.user;
+
+
+        console.log(
+            "Google User:",
+            user.displayName,
+            user.email
+        );
+
+
+        alert("Google Login Successful");
+
+
+        window.location.href="index.html";
+
+
+    }
+
+
+    catch(error){
+
+
+        console.log(error);
+
+        alert(error.message);
+
+    }
+
+
+
+});
+
+
 </script>
 </body>
 </html>
