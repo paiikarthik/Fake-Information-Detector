@@ -420,6 +420,7 @@ textarea{min-height:130px}
 
     <!-- FOOTER -->
     <footer>
+            For Accurate Result Use Date of Accedent/ News <br>
         FakeXpose AI &copy; 2026 | All Rights Reserved.
     </footer>
 
@@ -547,6 +548,17 @@ textarea{min-height:130px}
             steps.forEach(s => setStepState(s, "pending"));
         }
 
+        // External article titles/links are search results, so escape them before using innerHTML.
+        function escapeHtml(value) {
+            return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#39;"
+            }[char]));
+        }
+
         function runStepAnimations(callback) {
             const steps = ["step-claim", "step-retrieve", "step-factcheck", "step-semantic", "step-credibility", "step-decision"];
             let idx = 0;
@@ -649,7 +661,7 @@ textarea{min-height:130px}
                 badge.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Unverified`;
             }
 
-            explanation.innerHTML = data.explanation;
+            explanation.textContent = data.explanation;
 
             // 2. Setup Gauge confidence
             const percent = Math.round(data.confidence * 100);
@@ -669,7 +681,8 @@ textarea{min-height:130px}
             data.extracted.claims.forEach(claim => {
                 const div = document.createElement("div");
                 div.className = "claim-card";
-                div.innerHTML = `<i class="fa-solid fa-quote-left"></i><div class="claim-text">${claim}</div>`;
+                div.innerHTML = `<i class="fa-solid fa-quote-left"></i><div class="claim-text"></div>`;
+                div.querySelector(".claim-text").textContent = claim;
                 claimsList.appendChild(div);
             });
 
@@ -679,7 +692,7 @@ textarea{min-height:130px}
                 data.extracted.entities.forEach(ent => {
                     const span = document.createElement("span");
                     span.className = "entity-chip";
-                    span.innerHTML = `<i class="fa-solid fa-tags"></i> ${ent}`;
+                    span.innerHTML = `<i class="fa-solid fa-tags"></i> ${escapeHtml(ent)}`;
                     entitiesList.appendChild(span);
                 });
             } else {
@@ -692,7 +705,7 @@ textarea{min-height:130px}
                 data.extracted.keywords.forEach(kw => {
                     const span = document.createElement("span");
                     span.className = "keyword-chip";
-                    span.innerHTML = `<i class="fa-solid fa-hashtag"></i> ${kw}`;
+                    span.innerHTML = `<i class="fa-solid fa-hashtag"></i> ${escapeHtml(kw)}`;
                     keywordsList.appendChild(span);
                 });
             } else {
@@ -708,14 +721,17 @@ textarea{min-height:130px}
                     div.className = "evidence-card";
                     
                     const scoreClass = article.credibility >= 80 ? 'credibility-high' : (article.credibility >= 50 ? 'credibility-mid' : 'credibility-low');
+                    const source = escapeHtml(article.source);
+                    const title = escapeHtml(article.title);
+                    const link = escapeHtml(article.link);
                     
                     div.innerHTML = `
                         <div>
                             <div class="evidence-header">
-                                <span class="source-badge">${article.source}</span>
+                                <span class="source-badge">${source}</span>
                             </div>
                             <div style="margin-top: 0.75rem;">
-                                <a href="${article.link}" target="_blank" class="evidence-title" style="text-decoration: none;">${article.title}</a>
+                                <a href="${link}" target="_blank" rel="noopener noreferrer" class="evidence-title" style="text-decoration: none;">${title}</a>
                             </div>
                         </div>
                         <div>
@@ -730,7 +746,7 @@ textarea{min-height:130px}
                                 </div>
                             </div>
                             <div class="evidence-footer" style="margin-top: 10px;">
-                                <a href="${article.link}" target="_blank" class="link-btn">
+                                <a href="${link}" target="_blank" rel="noopener noreferrer" class="link-btn">
                                     Read Article <i class="fa-solid fa-arrow-up-right-from-square"></i>
                                 </a>
                             </div>
@@ -754,14 +770,17 @@ textarea{min-height:130px}
                 data.retrieved_factchecks.forEach(article => {
                     const div = document.createElement("div");
                     div.className = "evidence-card";
+                    const source = escapeHtml(article.source);
+                    const title = escapeHtml(article.title);
+                    const link = escapeHtml(article.link);
                     
                     div.innerHTML = `
                         <div>
                             <div class="evidence-header">
-                                <span class="source-badge" style="background: rgba(99, 102, 241, 0.1); border-color: rgba(99, 102, 241, 0.2); color: #a5b4fc;">${article.source}</span>
+                                <span class="source-badge" style="background: rgba(99, 102, 241, 0.1); border-color: rgba(99, 102, 241, 0.2); color: #a5b4fc;">${source}</span>
                             </div>
                             <div style="margin-top: 0.75rem;">
-                                <a href="${article.link}" target="_blank" class="evidence-title" style="text-decoration: none;">${article.title}</a>
+                                <a href="${link}" target="_blank" rel="noopener noreferrer" class="evidence-title" style="text-decoration: none;">${title}</a>
                             </div>
                         </div>
                         <div>
@@ -776,7 +795,7 @@ textarea{min-height:130px}
                                 </div>
                             </div>
                             <div class="evidence-footer" style="margin-top: 10px;">
-                                <a href="${article.link}" target="_blank" class="link-btn">
+                                <a href="${link}" target="_blank" rel="noopener noreferrer" class="link-btn">
                                     Read Verification <i class="fa-solid fa-shield"></i>
                                 </a>
                             </div>
@@ -799,5 +818,4 @@ textarea{min-height:130px}
     </script>
 </body>
 </html>
-
 
