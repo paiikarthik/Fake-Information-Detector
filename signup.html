@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Signup Now</title>
+     <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
     <style>
         body{
            margin: 0;
@@ -20,10 +23,10 @@
             padding: 15px 30px;
         }
         #logo{
-            font-size: 20px;
+            font-size: 30px;
             text-decoration: solid;
             color: white;
-            font-family: monospace;
+          
         }
 
 
@@ -73,30 +76,19 @@
             font-size: 15px;
         }
 
-         .forms input[type="email"], 
-         .forms input[type="text"]{
-            width: 100%;
-            padding: 10px;
-            margin-top: 8px;
-            margin-bottom: 18px;
+.forms input[type="email"],
+.forms input[type="text"],
+.forms input[type="password"]{
+    width:100%;
+    padding:10px;
+    margin-top:8px;
+    margin-bottom:2px; 
+    border:none;
+    border-radius:8px;
+    background:#f1f1f1;
+    font-size:14px;
+}
 
-            border: none;
-            border-radius: 8px;
-
-            background: #f1f1f1;
-            font-size: 14px;
-        }
-
-        .forms input[type="password"]
-        {
-            width: 100%;
-            padding: 10px;
-            margin-top: 8px;
-            border: none;
-            border-radius: 8px;
-            background: #f1f1f1;
-            font-size: 14px; 
-        }
 
         .forms input[type="submit"]{
             width: 100%;
@@ -118,11 +110,35 @@
           .forms input[type="submit"]:hover{
             background: #ffcc70;
         }
+
+.google-btn{
+    width:100%;
+    padding:10px;
+    margin-top:10px;
+    border:none;
+    border-radius:8px;
+    background:white;
+    color:black;
+    font-size:16px;
+    cursor:pointer;
+}
+
+.google-btn:hover{
+    background:#f1f1f1;
+}
+.error {
+    display: block;
+    color: red;
+    min-height: 14px;
+    font-size: 12px;
+    margin-top: 2px;
+    margin-bottom: 4px;
+}
     </style>
 </head>
 <body>
     <div class="navbar">
-    <div id="logo">FakeXpose AI</div>
+    <div id="logo">FakeXpose AI <i class="fa-solid fa-shield"></i></div>
 
     <nav id="navig">
         <ul>
@@ -141,7 +157,7 @@
         <form action="">
 
             <label for="name">Enter Your Name</label>
-            <input type="text" name="name" id="name"><br><br>
+            <input type="text" name="name" id="name">
 
             <label for="name">Enter Email ID</label><br>
             <input type="email" name="email" id="email" required><br>
@@ -153,65 +169,5 @@
         </form>
     </div>
 </div>
-
-<SCRipt>
-  
-
-    let nameInput = document.getElementById("name");
-    let emailInput = document.getElementById("email");
-    let passwordInput = document.getElementById("password");
-
-   
-    let nameError = document.createElement("small");
-    let emailError = document.createElement("small");
-    let passwordError = document.createElement("small");
-
-    nameError.style.color = "red";
-    emailError.style.color = "red";
-    passwordError.style.color = "red";
-
-   
-    nameInput.after(nameError);
-    emailInput.after(emailError);
-    passwordInput.after(passwordError);
-
-  
-    nameInput.addEventListener("input", function () {
-
-        if (nameInput.value.length < 3) {
-            nameError.textContent = "Name must be at least 3 characters";
-        }
-        else {
-            nameError.textContent = "";
-        }
-
-    });
-
-   
-    emailInput.addEventListener("input", function () {
-
-        let pattern = /^[^ ]+@[^ ]+\.[a-z]{2,3}$/;
-
-        if (!emailInput.value.match(pattern)) {
-            emailError.textContent = "Enter valid email";
-        }
-        else {
-            emailError.textContent = "";
-        }
-
-    });
-
-   
-    passwordInput.addEventListener("input", function () {
-
-        if (passwordInput.value.length < 6) {
-            passwordError.textContent = "Password must be at least 6 characters";
-        }
-        else {
-            passwordError.textContent = "";
-        }
-
-    });
-</script>
 </body>
 </html>

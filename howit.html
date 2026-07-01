@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How FakeXpose AI Works</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root{--primary:#6366f1;--accent:#22d3ee;--success:#10b981;--warning:#f59e0b;--danger:#f43f5e;--bg:#090d16;--panel:rgba(15,23,42,0.72);--text:#f3f4f6;--muted:#a5adbb;--border:rgba(255,255,255,0.09)}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Segoe UI',Arial,sans-serif;background:radial-gradient(circle at 50% 0%,#1e1b4b,#090d16 62%);color:var(--text);min-height:100vh;line-height:1.6}
+        nav{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:18px 6%;background:rgba(9,13,22,0.72);backdrop-filter:blur(14px);border-bottom:1px solid var(--border)}
+        .logo{font-size:1.45rem;font-weight:800;display:flex;align-items:center;gap:10px}
+        .logo i{color:var(--accent)}
+        .nav-links{display:flex;align-items:center;gap:18px}
+        .nav-links a{color:white;text-decoration:none;font-weight:650}
+        .nav-links a:hover{color:var(--accent)}
+        main{width:min(1120px,92%);margin:0 auto;padding:64px 0}
+        .hero{max-width:900px;margin-bottom:34px}
+        .eyebrow{display:inline-flex;align-items:center;gap:8px;color:var(--accent);font-weight:800;text-transform:uppercase;font-size:.82rem;letter-spacing:.08em;margin-bottom:14px}
+        h1{font-size:clamp(2.2rem,5vw,4.2rem);line-height:1.05;margin-bottom:18px}
+        .lead{font-size:1.12rem;color:var(--muted);max-width:780px}
+        .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;margin:28px 0}
+        .card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:22px}
+        .card h2,.card h3{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+        .card i{color:var(--accent)}
+        .card p,.card li{color:#cbd5e1}
+        .flow{display:grid;gap:14px;margin-top:18px}
+        .step{display:grid;grid-template-columns:44px 1fr;gap:14px;align-items:start;background:rgba(255,255,255,0.035);border:1px solid var(--border);border-radius:8px;padding:18px}
+        .num{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:rgba(34,211,238,0.12);color:var(--accent);font-weight:800;border:1px solid rgba(34,211,238,0.25)}
+        .pill-list{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+        .pill{border:1px solid var(--border);background:rgba(255,255,255,0.045);border-radius:999px;padding:7px 12px;color:#e5e7eb;font-size:.92rem}
+        .score{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid var(--border)}
+        .score:last-child{border-bottom:0}
+        .score strong{color:white}
+        .score span{color:var(--muted);text-align:right}
+        .note{border-left:4px solid var(--warning);background:rgba(245,158,11,0.08);padding:16px 18px;border-radius:8px;color:#fde68a;margin-top:20px}
+        footer{text-align:center;color:var(--muted);padding:28px 0 40px}
+        @media(max-width:700px){nav{align-items:flex-start;gap:12px;flex-direction:column}.nav-links{flex-wrap:wrap}.step{grid-template-columns:1fr}.score{align-items:flex-start;flex-direction:column}.score span{text-align:left}}
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="logo"><i class="fa-solid fa-shield-halved"></i> FakeXpose AI</div>
+        <div class="nav-links">
+            <a href="index.html">Detector</a>
+        </div>
+    </nav>
+
+    <main>
+        <section class="hero">
+            <div class="eyebrow"><i class="fa-solid fa-circle-nodes"></i> Verification Pipeline</div>
+            <h1>How This Project Checks Whether Information Is Real</h1>
+            <p class="lead">FakeXpose AI does not depend on one search result or one AI answer. It extracts the claim, searches news and fact-check sources, compares meaning with semantic similarity, scores source credibility, and then returns a verdict with confidence.</p>
+        </section>
+
+        <section class="grid">
+            <article class="card">
+                <h2><i class="fa-solid fa-brain"></i> Why Gemini Is Used</h2>
+                <p>Gemini is used for claim extraction. When the user pastes a long paragraph, Gemini converts it into structured data: main claims, important keywords, and named entities. This makes the search query cleaner and helps the system verify the exact statement instead of searching the whole paragraph blindly.</p>
+            </article>
+
+            <article class="card">
+                <h2><i class="fa-solid fa-newspaper"></i> Why NewsAPI Is Used</h2>
+                <p>NewsAPI retrieves recent related news articles from multiple publishers. If a NewsAPI key is not available or fails, the project falls back to Google News RSS so verification can still continue with public news results.</p>
+            </article>
+
+            <article class="card">
+                <h2><i class="fa-solid fa-shield-circle-check"></i> Why Fact-Check Sites Matter</h2>
+                <p>The project separately searches trusted fact-checking domains. These results get top priority because they are written specifically to confirm, debunk, or explain viral claims.</p>
+            </article>
+        </section>
+
+        <section class="card">
+            <h2><i class="fa-solid fa-diagram-project"></i> Project Flow</h2>
+            <div class="flow">
+                <div class="step">
+                    <div class="num">1</div>
+                    <div>
+                        <h3>Claim Extraction</h3>
+                        <p>Gemini extracts claims, keywords, and entities. If Gemini is not configured, the app uses local NLTK processing as a fallback.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="num">2</div>
+                    <div>
+                        <h3>News Retrieval</h3>
+                        <p>The app searches NewsAPI for related articles. If NewsAPI is unavailable, it searches Google News RSS.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="num">3</div>
+                    <div>
+                        <h3>Fact-Check Retrieval</h3>
+                        <p>The app searches official fact-check sources: Snopes, PolitiFact, FactCheck.org, and Reuters Fact Check.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="num">4</div>
+                    <div>
+                        <h3>Semantic Similarity</h3>
+                        <p>SentenceTransformer compares the extracted claim with article titles. This checks whether the article is actually about the same meaning, not just matching a few words.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="num">5</div>
+                    <div>
+                        <h3>Credibility Scoring</h3>
+                        <p>Each source gets a trust score. Official fact-checkers and major established publishers score higher. Blogs, forums, social media, and low-trust platforms are heavily reduced.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="num">6</div>
+                    <div>
+                        <h3>Final Verdict</h3>
+                        <p>The decision engine combines fact-check stance, semantic similarity, source credibility, refutation words, and critical event alignment to produce VERIFIED, FALSE, or UNVERIFIED.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="grid">
+            <article class="card">
+                <h2><i class="fa-solid fa-award"></i> Trusted Sources Listed</h2>
+                <p>The credibility logic recognizes these trusted publishers and knowledge sources:</p>
+                <div class="pill-list">
+                    <span class="pill">Reuters</span>
+                    <span class="pill">Associated Press / AP</span>
+                    <span class="pill">BBC</span>
+                    <span class="pill">Bloomberg</span>
+                    <span class="pill">New York Times</span>
+                    <span class="pill">Wall Street Journal</span>
+                    <span class="pill">Washington Post</span>
+                    <span class="pill">NPR</span>
+                    <span class="pill">The Guardian</span>
+                    <span class="pill">Al Jazeera</span>
+                    <span class="pill">CNN</span>
+                    <span class="pill">NDTV</span>
+                    <span class="pill">The Hindu</span>
+                    <span class="pill">Times of India</span>
+                    <span class="pill">Indian Express</span>
+                    <span class="pill">Snopes</span>
+                    <span class="pill">PolitiFact</span>
+                    <span class="pill">FactCheck.org</span>
+                    <span class="pill">Reuters Fact Check</span>
+                    <span class="pill">Mayo Clinic</span>
+                    <span class="pill">CDC</span>
+                    <span class="pill">WHO</span>
+                    <span class="pill">Healthline</span>
+                    <span class="pill">WebMD</span>
+                    <span class="pill">Scientific American</span>
+                    <span class="pill">Live Science</span>
+                    <span class="pill">Ars Technica</span>
+                    <span class="pill">ScienceDaily</span>
+                    <span class="pill">Forbes</span>
+                    <span class="pill">Time</span>
+                    <span class="pill">Newsweek</span>
+                    <span class="pill">USA Today</span>
+                    <span class="pill">U.S. News</span>
+                </div>
+            </article>
+
+            <article class="card">
+                <h2><i class="fa-solid fa-scale-balanced"></i> Credibility Scores</h2>
+                <div class="score"><strong>100</strong><span>Fact-checking sources, Reuters fact-check, AP, CDC, WHO</span></div>
+                <div class="score"><strong>95</strong><span>Very high-trust publishers like BBC, Bloomberg, NYT, WSJ, Washington Post, Scientific American</span></div>
+                <div class="score"><strong>90</strong><span>Strong sources like The Hindu, Guardian, NPR, Live Science, Ars Technica, ScienceDaily, Time</span></div>
+                <div class="score"><strong>80-85</strong><span>Recognized sources such as CNN, NDTV, Indian Express, Times of India, Forbes, WebMD, Healthline</span></div>
+                <div class="score"><strong>70</strong><span>Default score for standard news publications from Google News or NewsAPI</span></div>
+                <div class="score"><strong>15</strong><span>Blogs, forums, social media, Reddit, YouTube, TikTok, Facebook, X, Medium, and similar low-trust sources</span></div>
+            </article>
+        </section>
+
+        <section class="card">
+            <h2><i class="fa-solid fa-check-double"></i> How Accuracy Is Improved</h2>
+            <div class="grid">
+                <div>
+                    <h3>Fact-check priority</h3>
+                    <p>If a relevant Snopes, PolitiFact, FactCheck.org, or Reuters Fact Check result is found, it has priority over ordinary news results.</p>
+                </div>
+                <div>
+                    <h3>Meaning-based matching</h3>
+                    <p>The system uses semantic similarity, so a claim can match an article even when the wording is different.</p>
+                </div>
+                <div>
+                    <h3>Refutation detection</h3>
+                    <p>Words like false, fake, misleading, hoax, debunked, warning, harmful, and untrue help detect when an article is actually refuting the claim.</p>
+                </div>
+                <div>
+                    <h3>Critical event checks</h3>
+                    <p>For sensitive events like death, arrest, or resignation, the article title must align with that same event type. This reduces false positives from articles about the same person but a different event.</p>
+                </div>
+            </div>
+            <p class="note">Important: this project improves verification by combining multiple signals, but no automated system is perfect. Users should still read the linked sources for high-stakes claims.</p>
+        </section>
+    </main>
+
+    <footer>FakeXpose AI &copy; 2026 | How the verification pipeline works.</footer>
+</body>
+</html>
