@@ -44,6 +44,36 @@ TRUSTED_DOMAINS = {
     "www.daijiworld.com":75
 }
 
+TRUSTED_SOURCES = {
+    "reuters": 100,
+    "associated press": 95,
+    "ap news": 95,
+    "ap": 95,
+    "bbc": 95,
+    "new york times": 95,
+    "nytimes": 95,
+    "wall street journal": 95,
+    "wsj": 95,
+    "npr": 90,
+    "guardian": 90,
+    "al jazeera": 85,
+    "aljazeera": 85,
+    "the hindu": 90,
+    "indian express": 85,
+    "ndtv": 80,
+    "times of india": 80,
+    "timesofindia": 80,
+    "abp live": 70,
+    "abplive": 70,
+    "udayavani": 75,
+    "mangalore mirror": 80,
+    "vijay karnataka": 75,
+    "vijaykarnataka": 75,
+    "daijiworld": 75,
+    "france 24": 85,
+    "france24": 85,
+}
+
 LOW_TRUST_WORDS = (
     "blog",
     "forum",
@@ -223,6 +253,13 @@ def credibility(article):
     for trusted_domain, score in TRUSTED_DOMAINS.items():
         if trusted_domain in domain:
             return score
+
+    # Fallback: check source name case-insensitively using word boundary matching
+    source_lower = article.get("source", "").lower()
+    for trusted_source, score in TRUSTED_SOURCES.items():
+        if re.search(rf"\b{re.escape(trusted_source)}\b", source_lower):
+            return score
+
     return 65
 
 
@@ -286,7 +323,7 @@ def classify(news, fact_checks, claims, fetch_error=False):
         and critical_state_matches(primary_claim, article["title"])
     ]
 
-    if len(supporting) >= 2 or (supporting and supporting[0]["similarity"] >= 0.78):
+    if len(supporting) >= 2 or (supporting and supporting[0]["similarity"] >= 0.72):
         return verdict(
             "VERIFIED",
             supporting[0],
