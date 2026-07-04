@@ -86,6 +86,7 @@ LOW_TRUST_WORDS = (
     "youtube.com",
     "wordpress",
     "medium.com",
+    "tellychakkar.com",
 
 )
 
@@ -94,6 +95,8 @@ FALSE_WORDS = (
     "false",
     "fake",
     "hoax",
+    "hurrey",
+    "Shocking!"
     "misleading",
     "debunk",
     "debunked",
