@@ -8,17 +8,22 @@
 href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         body{
-           margin: 0;
+        
            font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-           background: #25170f;  
+           background: linear-gradient(to right,#390434,#853d14);  
 
         }
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
 
         .navbar{
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: linear-gradient(to bottom, #000000, #25170f);
             padding: 15px 30px;
         }
         #logo{
@@ -28,21 +33,21 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
             font-family: monospace;
         }
 
-        .google-btn{
-    width:100%;
-    padding:10px;
-    margin-top:10px;
-    border:none;
-    border-radius:8px;
-    background:white;
-    color:black;
-    font-size:16px;
-    cursor:pointer;
-}
+    .google-btn{
+        width:100%;
+        padding:10px;
+        margin-top:10px;
+        border:none;
+        border-radius:8px;
+        background:white;
+        color:black;
+        font-size:16px;
+        cursor:pointer;
+    }
 
-.google-btn:hover{
-    background:#f1f1f1;
-}
+    .google-btn:hover{
+        background:#f1f1f1;
+    }
         #navig ul{
             display: flex;
             gap: 20px;
@@ -133,20 +138,65 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
           .forms input[type="submit"]:hover{
             background: #ffcc70;
         }
+
+          nav {
+            width: 100%;
+            padding: 1rem 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background: rgb(51, 26, 2);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--glass-border);
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: white;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 30px;
+            align-items: center;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: white;
+            font-size: 1rem;
+            transition: 0.3s;
+           
+        }
+
+        .nav-links a:hover {
+            color: var(--primary);
+        }
+
+        #para{
+            color:red;
+            text-decoration:none;
+        }
+
+
     </style>
 </head>
 <body>
-    <div class="navbar">
-    <div id="logo">FakeXpose AI</div>
-
-    <nav id="navig">
-        <ul>
-            <li><a href="home.html">Home</a></li>
-            <li><a href="#">About</a></li>
-            <li><a href="#">Contact</a></li>
-            <li><a href="signup.html">Signup</a></li>
-        </ul>
-
+    <nav>
+   <div class="logo">
+            FakeXpose AI <i class="fa-solid fa-shield"></i>
+        </div>
+  <div class="nav-links">
+            <a href="home.html">Home</a>
+            <a href="#">About</a>
+            <a href="#">Contact</a>
+            <a href="signup.html">Signup</a>
+ </div>
     </nav>
  
     </div>
@@ -159,13 +209,13 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
 
             <label for="password">Enter Your password</label><br>
             <input type="password" name="password" id="password">
-            <p>Forgot password? <a href="passreset"> Click Here</a></p><br>
+            <p>Forgot password? <a href="passreset" id="para"> Click Here</a></p><br>
 
             <input type="submit" value="submit">
             <button type="button" id="googleSignIn" class="google-btn">
             <i class="fa-brands fa-google"></i> Login with Google
             </button>
-            <p>Don't Have an Account? <a href="signup.html"> Signup Now</a></p>
+            <p>Don't Have an Account? <a href="signup.html" id="para"> Signup Now</a></p>
         </form>
     </div>
 </div>
