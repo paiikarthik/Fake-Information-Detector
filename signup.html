@@ -6,14 +6,18 @@
     <title>Signup Now</title>
      <link rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-</head>
-    <style>
-        body{
-           margin: 0;
-           font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-           background: #25170f;  
 
-        }
+    <style>
+       *{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body{
+    background:#25170f;
+}
 
         .navbar{
             display: flex;
@@ -47,6 +51,7 @@
 
         #navig ul li a:hover{
             color: yellow;
+            font-size:20px;
         }
 
         .container{
@@ -58,7 +63,7 @@
         }
 
         .forms{
-            width: 320px;
+            width: 420px;
             padding: 30px;
             background: rgba(0,0,0,0.5);
             border-radius: 15px;
@@ -76,52 +81,61 @@
             font-size: 15px;
         }
 
-.forms input[type="email"],
 .forms input[type="text"],
-.forms input[type="password"]{
+.forms input[type="email"],
+.forms input[type="password"]
+{
     width:100%;
-    padding:10px;
+    height:42px;
+    padding:0 12px;
     margin-top:8px;
-    margin-bottom:2px; 
+    margin-bottom:2px;
     border:none;
     border-radius:8px;
-    background:#f1f1f1;
-    font-size:14px;
+    box-sizing:border-box;
+    font-size:15px;
 }
 
+.forms input[type="submit"],
+.google-btn{
+    width:100%;
+    height:45px;
+    padding:0;
+    margin-top:10px;
+    border:none;
+    border-radius:8px;
+    font-size:16px;
+    font-weight:bold;
+    cursor:pointer;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
 
-        .forms input[type="submit"]{
-            width: 100%;
-            padding: 10px;
+.forms input[type="submit"]{
+    background:#ffb347;
+    color:black;
+}
 
-            border: none;
-            border-radius: 8px;
+.google-btn{
+    width:100%;
+    padding:10px;
+    border:none;
+    border-radius:8px;
+    background:white;
+    font-size:16px;
+    cursor:pointer;
 
-            background: #ffb347;
-            color: black;
-
-            font-size: 16px;
-            font-weight: bold;
-
-            cursor: pointer;
-            transition: 0.3s;
-        }
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    gap:8px;
+}
 
           .forms input[type="submit"]:hover{
             background: #ffcc70;
         }
 
-.google-btn{
-    width:100%;
-    padding:10px;
-    margin-top:10px;
-    border:none;
-    border-radius:8px;
-    background:white;
-    color:black;
-    font-size:16px;
-    cursor:pointer;
-}
 
 .google-btn:hover{
     background:#f1f1f1;
@@ -133,6 +147,10 @@
     font-size: 12px;
     margin-top: 2px;
     margin-bottom: 4px;
+}
+#para{
+    color:green;
+    text-decoration:none;
 }
     </style>
 </head>
@@ -168,9 +186,9 @@
 <small id="passwordError" class="error"></small>
          <input type="submit" value="submit" id="submit">
          <button type="button" id="googleSignIn" class="google-btn">
-    <i class="fa-brands fa-google"></i> Sign in with Google
+     <span>Sign in with Google</span> <i class="fa-brands fa-google"></i>
 </button>
-            <p>Already Have an Account? <a href="Login.html"> Login Now</a></p>
+            <p>Already Have an Account? <a href="Login.html" id="para"> Login Now</a></p>
         </form>
     </div>
 </div>
