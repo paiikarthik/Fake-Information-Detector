@@ -292,9 +292,44 @@ def critical_state_matches(claim, title):
     return True
 
 
+def has_political_role_conflict(claim, title):
+    """Detect if the claim and evidence mention conflicting political offices."""
+    claim = claim.lower()
+    title = title.lower()
+    
+    roles = {
+        "prime_minister": ["prime minister", r"\bpm\b"],
+        "chief_minister": ["chief minister", r"\bcm\b"],
+        "president": ["president"],
+        "governor": ["governor"],
+    }
+    
+    claim_roles = set()
+    for role_name, patterns in roles.items():
+        if any(re.search(pattern, claim) for pattern in patterns):
+            claim_roles.add(role_name)
+            
+    title_roles = set()
+    for role_name, patterns in roles.items():
+        if any(re.search(pattern, title) for pattern in patterns):
+            title_roles.add(role_name)
+            
+    if claim_roles and title_roles:
+        # If there's no overlap between the roles mentioned in the claim vs those in the title, it's a conflict
+        if not (claim_roles & title_roles):
+            return True
+            
+    return False
+
+
 def classify(news, fact_checks, claims, fetch_error=False):
     """Make the final decision. Refutations beat loose supporting matches."""
     primary_claim = claims[0] if claims else ""
+    
+    # Filter out articles with political role conflicts to avoid false positives
+    news = [art for art in news if not has_political_role_conflict(primary_claim, art["title"])]
+    fact_checks = [art for art in fact_checks if not has_political_role_conflict(primary_claim, art["title"])]
+    
     all_articles = news + fact_checks
 
     # 1. Trusted fact-checks have the highest priority.
