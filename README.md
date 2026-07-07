@@ -18,3 +18,5 @@ Gemini extracts claims, keywords, and entities. If Gemini is not configured, the
 5. **Credibility Scoring:** Each source gets a trust score. Official fact-checkers and major established publishers score higher. Blogs, forums, social media, and low-trust platforms are heavily reduced.
 
 6. **Final Verdict:** The decision engine combines fact-check stance, semantic similarity, source credibility, refutation words, and critical event alignment to produce VERIFIED, FALSE, or UNVERIFIED.
+
+7. **Gemini API** It Understands the user context and compare the user meaning with news.
