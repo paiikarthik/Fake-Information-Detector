@@ -19,7 +19,7 @@ import urllib.parse
 import xml.etree.ElementTree as ET
 import requests
 from dotenv import load_dotenv
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
 load_dotenv()
@@ -408,7 +408,22 @@ def generate_explanation(claim, verdict, news, fact_checks, gemini_api_key=None)
 # STEP 7: FLASK API ENDPOINTS
 # ==============================================================================
 
+@app.route("/", methods=["GET"])
+def serve_index():
+    """Serve main index.html page."""
+    return send_from_directory(".", "index.html")
+
+
+@app.route("/<path:path>", methods=["GET"])
+def serve_static(path):
+    """Serve static files or HTML pages."""
+    if os.path.exists(path):
+        return send_from_directory(".", path)
+    return send_from_directory(".", "index.html")
+
+
 @app.route("/api/config", methods=["GET"])
+
 def get_config():
     """Return public configuration and API key availability."""
     return jsonify({

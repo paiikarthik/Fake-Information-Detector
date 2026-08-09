@@ -416,7 +416,8 @@ textarea{min-height:130px}
         };
 
         try {
-            const configRes = await fetch("http://localhost:5000/api/config");
+            const configRes = await fetch("/api/config");
+
             if (configRes.ok) {
                 const configData = await configRes.json();
                 if (configData.firebase && configData.firebase.apiKey) {
@@ -588,7 +589,8 @@ textarea{min-height:130px}
                 // Trigger visual stages timer
                 runStepAnimations(async () => {
                     try {
-                        const response = await fetch("http://localhost:5000/analyze", {
+                        const response = await fetch("/analyze", {
+
                             method: "POST",
                             headers: {
                                 "Content-Type": "application/json",

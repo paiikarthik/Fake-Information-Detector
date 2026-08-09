@@ -315,7 +315,8 @@ let firebaseConfig = {
 };
 
 try {
-  const configRes = await fetch("http://localhost:5000/api/config");
+  const configRes = await fetch("/api/config");
+
   if (configRes.ok) {
     const configData = await configRes.json();
     if (configData.firebase && configData.firebase.apiKey) {
