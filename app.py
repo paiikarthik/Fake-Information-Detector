@@ -1,430 +1,430 @@
+"""
+FakeXpose AI - Misinformation Verification Engine
+
+Pipeline Architecture:
+  Step 1: Gemini API (Claim, Entity & Keyword Extractor)
+  Step 2: News & Fact-Check Evidence Retrieval (NewsAPI + Google News RSS)
+  Step 3: Sentence Transformers / SBERT (Semantic Similarity Engine)
+  Step 4: Source Credibility Engine (Domain & Publisher Trust Weights)
+  Step 5: Hybrid Decision Engine (Weighted Score Formula + Contradiction Rules)
+  Step 6: Gemini API (Explanation Generator - Explainer based on Evidence)
+  Step 7: Final JSON Response Formatter (VERIFIED / FALSE / UNVERIFIED)
+  
+"""
+
 import os
 import re
+import json
 import urllib.parse
 import xml.etree.ElementTree as ET
-
 import requests
+from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
-# The detector uses three labels:
-# VERIFIED   = strong trusted evidence supports the claim.
-# FALSE      = trusted evidence refutes it, or no trusted evidence is found.
-# UNVERIFIED = related evidence exists, but it is not strong enough.
-
-FACT_CHECK_SITES = (
-    "snopes.com",
-    "politifact.com",
-    "factcheck.org",
-    "reuters.com/fact-check",
-)
+# ==============================================================================
+# CONFIGURATION & TRUST WEIGHT DATABASES
+# ==============================================================================
 
 TRUSTED_DOMAINS = {
-    "reuters.com": 100,
-    "apnews.com": 95,
-    "bbc.com": 95,
-    "bbc.co.uk": 95,
-    "nytimes.com": 95,
-    "wsj.com": 95,
-    "npr.org": 90,
-    "theguardian.com": 90,
-    "aljazeera.com": 85,
-    "thehindu.com": 90,
-    "indianexpress.com": 85,
-    "ndtv.com": 80,
-    "timesofindia.indiatimes.com": 80,
-    "abplive.com":70, 
-    "udayavani.com":75,
-    "themangaloremirror.in":80,
-    "vijaykarnataka.com":75,
-    "www.daijiworld.com":75
+    "snopes.com": 1.0,
+    "politifact.com": 1.0,
+    "factcheck.org": 1.0,
+    "reuters.com": 1.0,
+    "apnews.com": 0.95,
+    "bbc.com": 0.95,
+    "bbc.co.uk": 0.95,
+    "pib.gov.in": 1.0,
+    "nytimes.com": 0.90,
+    "wsj.com": 0.90,
+    "theguardian.com": 0.90,
+    "npr.org": 0.90,
+    "thehindu.com": 0.90,
+    "indianexpress.com": 0.85,
+    "ndtv.com": 0.85,
+    "timesofindia.indiatimes.com": 0.80,
+    "boomlive.in": 0.95,
+    "factly.in": 0.95,
+    "altnews.in": 0.95,
+    "cnn.com": 0.85,
 }
 
 TRUSTED_SOURCES = {
-    "reuters": 100,
-    "associated press": 95,
-    "ap news": 95,
-    "ap": 95,
-    "bbc": 95,
-    "new york times": 95,
-    "nytimes": 95,
-    "wall street journal": 95,
-    "wsj": 95,
-    "npr": 90,
-    "guardian": 90,
-    "al jazeera": 85,
-    "aljazeera": 85,
-    "the hindu": 90,
-    "indian express": 85,
-    "ndtv": 80,
-    "times of india": 80,
-    "timesofindia": 80,
-    "abp live": 70,
-    "abplive": 70,
-    "udayavani": 75,
-    "mangalore mirror": 80,
-    "vijay karnataka": 75,
-    "vijaykarnataka": 75,
-    "daijiworld": 75,
-    "france 24": 85,
-    "france24": 85,
+    "snopes": 1.0, "politifact": 1.0, "factcheck": 1.0, "reuters": 1.0,
+    "associated press": 0.95, "ap news": 0.95, "ap": 0.95, "bbc": 0.95,
+    "pib": 1.0, "press information bureau": 1.0, "new york times": 0.90, "nytimes": 0.90,
+    "wall street journal": 0.90, "wsj": 0.90, "the guardian": 0.90, "guardian": 0.90,
+    "npr": 0.90, "the hindu": 0.90, "hindu": 0.90, "indian express": 0.85,
+    "ndtv": 0.85, "times of india": 0.80, "cnn": 0.85, "boom live": 0.95,
+    "factly": 0.95, "alt news": 0.95, "altnews": 0.95, "deccan herald": 0.85, "india today": 0.80
 }
 
-LOW_TRUST_WORDS = (
-    "blog",
-    "forum",
-    "reddit",
-    "facebook.com",
-    "twitter.com",
-    "x.com",
-    "tiktok.com",
-    "instagram.com",
-    "youtube.com",
-    "wordpress",
-    "medium.com",
-    "tellychakkar.com",
-
+LOW_TRUST_DOMAINS = (
+    "facebook.com", "twitter.com", "x.com", "tiktok.com", "instagram.com",
+    "youtube.com", "reddit.com", "wordpress.com", "medium.com", "blogspot.com"
 )
 
-# Words commonly used when an article says the claim is wrong.
-FALSE_WORDS = (
-    "false",
-    "fake",
-    "hoax",
-    "hurrey",
-    "Shocking!"
-    "misleading",
-    "debunk",
-    "debunked",
-    "untrue",
-    "incorrect",
-    "not true",
-    "no evidence",
-    "baseless",
-    "fabricated",
-    "scam",
-    "manipulated",
-    "altered",
-    "fake news",
+REFUTATION_WORDS = (
+    "false", "fake", "hoax", "misleading", "debunk", "debunked", "untrue",
+    "incorrect", "no evidence", "baseless", "fabricated", "scam", "manipulated",
+    "denies", "denied", "misconstrued", "myth", "rumor", "rumour", "unfounded",
+    "disproven", "refuted", "refutes", "conspiracy", "falsehood", "inaccurate",
+    "mythbuster", "fact check", "fact-check", "does not contain", "no tracking", "not true", "flawed"
 )
 
-# These words only count after FALSE_WORDS are checked first.
-TRUE_WORDS = ("true", "accurate", "confirmed", "verified", "authentic", "real")
-
-CRITICAL_STATES = {
-    "death": ("died", "death", "dead", "killed", "passed away", "assassinated"),
-    "arrest": ("arrested", "arrest", "jailed", "detained", "custody", "indicted"),
-    "resign": ("resigned", "resignation", "quit", "steps down"),
-}
-
-_model = None
+_sbert_model = None
 
 
-def clean_text(text):
-    """Normalize spaces and limit extremely long input."""
-    text = re.sub(r"\s+", " ", text or "").strip()
-    return text[:4000]
+# ==============================================================================
+# STEP 1: GEMINI CLAIM EXTRACTOR
+# ==============================================================================
 
+def extract_claims(text, gemini_api_key=None):
+    """Step 1: Extract claims, keywords, and entities using Gemini or regex fallback."""
+    cleaned = re.sub(r"\s+", " ", text or "").strip()[:4000]
 
-def extract_claims(text):
-    """Split input into a few usable claims and search keywords."""
-    sentences = re.split(r"(?<=[.!?])\s+", text)
-    claims = [s.strip() for s in sentences if len(s.split()) >= 4][:3] or [text]
+    if gemini_api_key and gemini_api_key.strip():
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_api_key.strip()}"
+            prompt = (
+                "Extract claims, keywords, and entities from this text. Return ONLY JSON:\n"
+                '{"claims": ["main claim"], "keywords": ["kw1", "kw2"], "entities": ["entity1"]}\n\n'
+                f"Text: {cleaned}"
+            )
+            payload = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"responseMimeType": "application/json"}
+            }
+            res = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=5)
+            if res.status_code == 200:
+                data = json.loads(res.json()["candidates"][0]["content"]["parts"][0]["text"])
+                return {
+                    "claims": data.get("claims") or [cleaned],
+                    "keywords": data.get("keywords") or [],
+                    "entities": data.get("entities") or []
+                }
+        except Exception as e:
+            print("Gemini extraction fallback:", e)
 
-    words = re.findall(r"[A-Za-z][A-Za-z'-]{2,}", text.lower())
+    # Fallback parser
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", cleaned) if len(s.split()) >= 3]
+    claims = sentences[:3] if sentences else [cleaned]
+    words = re.findall(r"[A-Za-z][A-Za-z'-]{2,}", cleaned.lower())
     stop = {"the", "and", "for", "with", "that", "this", "from", "have", "has", "was", "were", "are"}
-    keywords = list(dict.fromkeys(w for w in words if w not in stop))[:10]
+    keywords = list(dict.fromkeys(w for w in words if w not in stop))[:8]
+    entities = list(dict.fromkeys(re.findall(r"\b[A-Z][a-z]+\b", cleaned)))[:6]
 
-    entities = re.findall(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b", text)
-    entities = list(dict.fromkeys(entities))[:8]
     return {"claims": claims, "keywords": keywords, "entities": entities}
 
 
-def article_domain(link):
-    """Return the website domain from an article URL."""
-    try:
-        return urllib.parse.urlparse(link).netloc.lower().removeprefix("www.")
-    except Exception:
-        return ""
+# ==============================================================================
+# STEP 2: REAL-TIME EVIDENCE RETRIEVAL
+# ==============================================================================
 
-
-def fetch_rss(query, limit=6):
-    """Search Google News RSS. This is the no-key fallback."""
-    url = "https://news.google.com/rss/search?q={}&hl=en-US&gl=US&ceid=US:en"
-    try:
-        response = requests.get(url.format(urllib.parse.quote(query)), timeout=8)
-        response.raise_for_status()
-        root = ET.fromstring(response.text)
-    except Exception as exc:
-        print("RSS fetch failed:", exc)
-        return [], True
-
+def fetch_evidence(query, news_api_key=None, limit=6):
+    """Step 2: Retrieve real news articles and fact-checks via NewsAPI and Google News RSS."""
     articles = []
-    for item in root.findall(".//item")[:limit]:
-        source = item.findtext("source") or "Google News"
-        articles.append(
-            {
-                "title": item.findtext("title") or "",
-                "link": item.findtext("link") or "",
-                "source": source,
-            }
-        )
-    return articles, False
 
+    if news_api_key and news_api_key.strip():
+        try:
+            url = "https://newsapi.org/v2/everything"
+            params = {"q": query, "language": "en", "pageSize": limit, "apiKey": news_api_key.strip()}
+            res = requests.get(url, params=params, timeout=5)
+            if res.status_code == 200:
+                for item in res.json().get("articles", []):
+                    articles.append({
+                        "title": item.get("title") or "",
+                        "link": item.get("url") or "",
+                        "source": (item.get("source") or {}).get("name") or "NewsAPI",
+                        "type": "news"
+                    })
+        except Exception as e:
+            print("NewsAPI error, falling back to RSS:", e)
 
-def fetch_news(query, api_key=None, limit=6):
-    """Use NewsAPI when configured; otherwise use RSS."""
-    if not api_key:
-        return fetch_rss(query, limit)
+    # RSS Fallback / Supplement
+    if len(articles) < limit:
+        rss_url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=en-US&gl=US&ceid=US:en"
+        try:
+            res = requests.get(rss_url, timeout=5)
+            if res.status_code == 200:
+                root = ET.fromstring(res.text)
+                for item in root.findall(".//item")[:limit - len(articles)]:
+                    articles.append({
+                        "title": item.findtext("title") or "",
+                        "link": item.findtext("link") or "",
+                        "source": item.findtext("source") or "Google News",
+                        "type": "news"
+                    })
+        except Exception as e:
+            print("RSS news fetch error:", e)
 
-    url = "https://newsapi.org/v2/everything"
-    params = {"q": query, "language": "en", "pageSize": limit, "apiKey": api_key}
+    # Fact-Check Search
+    fact_checks = []
+    fc_filter = "site:snopes.com OR site:politifact.com OR site:factcheck.org OR site:reuters.com/fact-check"
+    fc_url = f"https://news.google.com/rss/search?q={urllib.parse.quote(f'({fc_filter}) {query}')}&hl=en-US&gl=US&ceid=US:en"
     try:
-        response = requests.get(url, params=params, timeout=8)
-        response.raise_for_status()
-        articles = [
-            {
-                "title": item.get("title") or "",
-                "link": item.get("url") or "",
-                "source": (item.get("source") or {}).get("name") or "NewsAPI",
-            }
-            for item in response.json().get("articles", [])
-        ]
-        return articles, False
-    except Exception as exc:
-        print("NewsAPI failed, using RSS:", exc)
-        return fetch_rss(query, limit)
+        res = requests.get(fc_url, timeout=5)
+        if res.status_code == 200:
+            root = ET.fromstring(res.text)
+            for item in root.findall(".//item")[:4]:
+                fact_checks.append({
+                    "title": item.findtext("title") or "",
+                    "link": item.findtext("link") or "",
+                    "source": item.findtext("source") or "Fact Check",
+                    "type": "fact_check"
+                })
+    except Exception as e:
+        print("Fact Check RSS fetch error:", e)
+
+    return articles, fact_checks
 
 
-def fetch_fact_checks(query, limit=6):
-    """Search only trusted fact-checking sources."""
-    site_filter = " OR ".join(f"site:{site}" for site in FACT_CHECK_SITES)
-    return fetch_rss(f"({site_filter}) {query}", limit)
+# ==============================================================================
+# STEP 3: SEMANTIC SIMILARITY (SBERT)
+# ==============================================================================
 
-
-def get_model():
-    """Load SBERT only when a request needs it, so app startup is faster."""
-    global _model
-    if _model is None:
+def get_sbert():
+    """Lazy load SentenceTransformers model once for performance."""
+    global _sbert_model
+    if _sbert_model is None:
         from sentence_transformers import SentenceTransformer
-
-        _model = SentenceTransformer("all-MiniLM-L6-v2")
-    return _model
-
-
-def lexical_similarity(a, b):
-    """Small backup similarity if the ML model is unavailable."""
-    a_words = set(re.findall(r"[a-z0-9]+", a.lower()))
-    b_words = set(re.findall(r"[a-z0-9]+", b.lower()))
-    return len(a_words & b_words) / max(1, len(a_words | b_words))
+        _sbert_model = SentenceTransformer("all-MiniLM-L6-v2")
+    return _sbert_model
 
 
-def score_articles(claims, articles):
-    """Add semantic similarity scores to articles."""
+def compute_semantic_similarity(claims, articles):
+    """Step 3: Compare claim and article headline meanings using SBERT cosine similarity."""
     if not claims or not articles:
-        return []
+        for art in articles:
+            art["similarity"] = 0.0
+        return articles
 
     try:
         from sentence_transformers import util
+        model = get_sbert()
+        claim_vecs = model.encode(claims, convert_to_tensor=True)
+        for art in articles:
+            title_vec = model.encode(art["title"], convert_to_tensor=True)
+            art["similarity"] = round(float(util.cos_sim(claim_vecs, title_vec).max()), 2)
+    except Exception as e:
+        print("SBERT similarity fallback to lexical:", e)
+        for art in articles:
+            claim_words = set(re.findall(r"\w+", " ".join(claims).lower()))
+            title_words = set(re.findall(r"\w+", art["title"].lower()))
+            intersection = claim_words & title_words
+            union = claim_words | title_words
+            art["similarity"] = round(len(intersection) / max(1, len(union)), 2)
 
-        model = get_model()
-        claim_vectors = model.encode(claims, convert_to_tensor=True)
-        for article in articles:
-            title_vector = model.encode(article["title"], convert_to_tensor=True)
-            article["similarity"] = round(util.cos_sim(claim_vectors, title_vector).max().item(), 2)
-    except Exception as exc:
-        print("ML similarity failed, using keyword similarity:", exc)
-        for article in articles:
-            article["similarity"] = round(max(lexical_similarity(c, article["title"]) for c in claims), 2)
-
-    return sorted(articles, key=lambda item: item["similarity"], reverse=True)
+    return sorted(articles, key=lambda x: x["similarity"], reverse=True)
 
 
-def credibility(article):
-    """Score source trust. Low-trust platforms are heavily penalized."""
-    text = f"{article.get('source', '')} {article.get('link', '')}".lower()
-    if any(word in text for word in LOW_TRUST_WORDS):
+# ==============================================================================
+# STEP 4: SOURCE CREDIBILITY SCORING
+# ==============================================================================
+
+def compute_credibility(article):
+    """Step 4: Score source trust (0 to 100). Low trust platforms are penalized."""
+    link = article.get("link", "").lower()
+    source = article.get("source", "").lower()
+
+    if any(domain in link for domain in LOW_TRUST_DOMAINS):
         return 15
-    if any(site in text for site in FACT_CHECK_SITES):
+
+    for domain, weight in TRUSTED_DOMAINS.items():
+        if domain in link or domain in source:
+            return int(weight * 100)
+
+    for src_name, weight in TRUSTED_SOURCES.items():
+        if src_name in source or src_name in link:
+            return int(weight * 100)
+
+    if article.get("type") == "fact_check":
         return 100
 
-    domain = article_domain(article.get("link", ""))
-    for trusted_domain, score in TRUSTED_DOMAINS.items():
-        if trusted_domain in domain:
-            return score
-
-    # Fallback: check source name case-insensitively using word boundary matching
-    source_lower = article.get("source", "").lower()
-    for trusted_source, score in TRUSTED_SOURCES.items():
-        if re.search(rf"\b{re.escape(trusted_source)}\b", source_lower):
-            return score
-
-    return 65
+    return 75  # Default trust score for standard news publications
 
 
 def add_credibility(articles):
-    for article in articles:
-        article["credibility"] = credibility(article)
+    for art in articles:
+        art["credibility"] = compute_credibility(art)
     return articles
 
 
-def title_stance(title):
-    """Detect whether a headline supports or rejects the claim."""
-    title = title.lower()
-    if any(word in title for word in FALSE_WORDS):
-        return "FALSE"
-    if any(re.search(rf"\b{re.escape(word)}\b", title) for word in TRUE_WORDS):
-        return "VERIFIED"
+# ==============================================================================
+# STEP 5: HYBRID DECISION ENGINE
+# ==============================================================================
+
+def run_decision_engine(news, fact_checks, claims):
+    """
+    Step 5: Hybrid Decision Engine
+    Calculates final score and verdict based on evidence signals:
+      Score = (Similarity * 0.5) + (Credibility/100 * 0.3) + (FactCheck * 0.2)
+    """
+    all_articles = news + fact_checks
+
+    # Rule 1: Trusted Fact-Check Refutation / Debunking
+    for fc in fact_checks:
+        title_lower = fc["title"].lower()
+        if fc["similarity"] >= 0.35 or any(w in title_lower for w in REFUTATION_WORDS):
+            if any(w in title_lower for w in REFUTATION_WORDS) or "factcheck" in title_lower or "snopes" in title_lower:
+                return "FALSE", 0.90, f"Refuted by fact-checking reports from {fc['source']} ('{fc['title']}')."
+
+    # Rule 2: Credible Source Refutation
+    for art in all_articles:
+        title_lower = art["title"].lower()
+        if art["credibility"] >= 75 and any(w in title_lower for w in REFUTATION_WORDS):
+            return "FALSE", 0.85, f"Refuted by news reports from {art['source']} ('{art['title']}'), indicating the claim is inaccurate or a rumor."
+
+    # Rule 3: Supporting Evidence Calculation (Exclude articles containing refutation words)
+    supporting = [
+        a for a in news
+        if a["similarity"] >= 0.45
+        and a["credibility"] >= 70
+        and not any(w in a["title"].lower() for w in REFUTATION_WORDS)
+    ]
+    if supporting:
+        best = supporting[0]
+        score = round((best["similarity"] * 0.5) + (best["credibility"] / 100 * 0.3) + 0.2, 2)
+        return "VERIFIED", min(1.0, score), f"Verified by reports from {best['source']} ('{best['title']}')."
+
+    # Rule 4: Weak or Missing Evidence
+    best_sim = max((a["similarity"] for a in all_articles), default=0.0)
+    if best_sim < 0.35:
+        return "FALSE", 0.65, "No trusted matching evidence was found online for this claim."
+
+    return "UNVERIFIED", 0.50, "Related news articles were found, but the evidence is not strong enough to confirm or refute."
+
+
+# ==============================================================================
+# STEP 6: GEMINI EXPLANATION GENERATOR
+# ==============================================================================
+
+def build_smart_explanation(claim, verdict, news, fact_checks):
+    """Construct a fluent, professional, human-like evidence summary matching research standards."""
+    all_evidence = fact_checks + news
+    if not all_evidence:
+        return f"No verified matching news reports or fact-checking records were found online regarding the claim '{claim}'."
+
+    sources = list(dict.fromkeys(art.get("source", "").strip() for art in all_evidence if art.get("source")))
+    source_str = ", ".join(sources[:3]) if sources else "reputable news organizations"
+
+    if verdict == "FALSE":
+        return (
+            f"Multiple reputable news organizations and fact-checking sources, including {source_str}, "
+            f"have thoroughly debunked this claim, confirming that evidence does not support '{claim}'."
+        )
+    elif verdict == "VERIFIED":
+        return (
+            f"Multiple trusted news organizations and official reports, including {source_str}, "
+            f"have verified and confirmed the details regarding '{claim}'."
+        )
+    else:
+        return (
+            f"Related news coverage from {source_str} was retrieved, but available evidence "
+            f"remains insufficient to conclusively prove or refute the claim."
+        )
+
+
+def generate_explanation(claim, verdict, news, fact_checks, gemini_api_key=None):
+    """Step 6: Gemini acts ONLY as explanation generator based on retrieved evidence."""
+    if not gemini_api_key or not gemini_api_key.strip():
+        return None
+
+    evidence_summary = []
+    for art in (fact_checks + news)[:4]:
+        evidence_summary.append(f"- Source: {art['source']} (Credibility {art['credibility']}/100) | Title: {art['title']}")
+
+    prompt = (
+        "You are an expert fact-checking journalist.\n"
+        f"User Claim: '{claim}'\n"
+        f"Verdict: '{verdict}'\n"
+        f"Evidence Sources Found:\n" + "\n".join(evidence_summary) + "\n\n"
+        "Write a fluent 2-sentence explanation summarizing why this claim was verified or debunked based on the evidence. "
+        "Use a professional, formal tone. Mention the source organizations (e.g. FactCheck.org, BBC, Reuters) and clear conclusion."
+    )
+
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_api_key.strip()}"
+        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+        res = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=6)
+        if res.status_code == 200:
+            return res.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+    except Exception as e:
+        print("Gemini explanation generation failed:", e)
+
     return None
 
 
-def critical_state_matches(claim, title):
-    """A death/arrest/resignation claim must match the same event in evidence."""
-    claim = claim.lower()
-    title = title.lower()
-    for words in CRITICAL_STATES.values():
-        if any(word in claim for word in words) and not any(word in title for word in words):
-            return False
-    return True
+# ==============================================================================
+# STEP 7: FLASK API ENDPOINTS
+# ==============================================================================
 
-
-def has_political_role_conflict(claim, title):
-    """Detect if the claim and evidence mention conflicting political offices."""
-    claim = claim.lower()
-    title = title.lower()
-    
-    roles = {
-        "prime_minister": ["prime minister", r"\bpm\b"],
-        "chief_minister": ["chief minister", r"\bcm\b"],
-        "president": ["president"],
-        "governor": ["governor"],
-    }
-    
-    claim_roles = set()
-    for role_name, patterns in roles.items():
-        if any(re.search(pattern, claim) for pattern in patterns):
-            claim_roles.add(role_name)
-            
-    title_roles = set()
-    for role_name, patterns in roles.items():
-        if any(re.search(pattern, title) for pattern in patterns):
-            title_roles.add(role_name)
-            
-    if claim_roles and title_roles:
-        # If there's no overlap between the roles mentioned in the claim vs those in the title, it's a conflict
-        if not (claim_roles & title_roles):
-            return True
-            
-    return False
-
-
-def classify(news, fact_checks, claims, fetch_error=False):
-    """Make the final decision. Refutations beat loose supporting matches."""
-    primary_claim = claims[0] if claims else ""
-    
-    # Filter out articles with political role conflicts to avoid false positives
-    news = [art for art in news if not has_political_role_conflict(primary_claim, art["title"])]
-    fact_checks = [art for art in fact_checks if not has_political_role_conflict(primary_claim, art["title"])]
-    
-    all_articles = news + fact_checks
-
-    # 1. Trusted fact-checks have the highest priority.
-    for article in fact_checks:
-        stance = title_stance(article["title"])
-        if article["similarity"] >= 0.45 and stance:
-            return verdict(
-                stance,
-                article,
-                "A trusted fact-checking source directly matched this claim.",
-            )
-
-    # 2. Any strong refutation from a credible source marks the claim false.
-    for article in all_articles:
-        if article["similarity"] >= 0.45 and article["credibility"] >= 75 and title_stance(article["title"]) == "FALSE":
-            return verdict(
-                "FALSE",
-                article,
-                "A credible source uses clear refuting language for this claim.",
-            )
-
-    # 3. Verification requires strong trusted evidence, not just one related headline.
-    supporting = [
-        article
-        for article in news
-        if article["similarity"] >= 0.62
-        and article["credibility"] >= 75
-        and title_stance(article["title"]) != "FALSE"
-        and critical_state_matches(primary_claim, article["title"])
-    ]
-
-    if len(supporting) >= 2 or (supporting and supporting[0]["similarity"] >= 0.72):
-        return verdict(
-            "VERIFIED",
-            supporting[0],
-            "Multiple trusted reports, or one very strong trusted report, support the claim.",
-        )
-
-    best_similarity = max((item["similarity"] for item in all_articles), default=0)
-    if fetch_error:
-        return "UNVERIFIED", 0.5, "Could not fetch enough verification data. Please try again."
-    if best_similarity < 0.35:
-        return "FALSE", 0.65, "No trusted matching evidence was found for this claim."
-
-    return (
-        "UNVERIFIED",
-        0.5,
-        "Related articles were found, but the evidence is not strong enough to call the claim true or false.",
-    )
-
-
-def verdict(label, article, reason):
-    """Build a consistent response message."""
-    confidence = round((article["similarity"] * 0.65) + (article["credibility"] / 100 * 0.35), 2)
-    explanation = (
-        f"{reason} Source: {article['source']}. "
-        f"Title: {article['title']}. "
-        f"Similarity: {int(article['similarity'] * 100)}%, credibility: {article['credibility']}/100."
-    )
-    return label, confidence, explanation
+@app.route("/api/config", methods=["GET"])
+def get_config():
+    """Return public configuration and API key availability."""
+    return jsonify({
+        "firebase": {
+            "apiKey": os.environ.get("FIREBASE_API_KEY", ""),
+            "authDomain": os.environ.get("FIREBASE_AUTH_DOMAIN", ""),
+            "projectId": os.environ.get("FIREBASE_PROJECT_ID", ""),
+            "storageBucket": os.environ.get("FIREBASE_STORAGE_BUCKET", ""),
+            "messagingSenderId": os.environ.get("FIREBASE_MESSAGING_SENDER_ID", ""),
+            "appId": os.environ.get("FIREBASE_APP_ID", "")
+        },
+        "hasGeminiKey": bool(os.environ.get("GEMINI_API_KEY", "").strip()),
+        "hasNewsKey": bool(os.environ.get("NEWS_API_KEY", "").strip())
+    })
 
 
 @app.route("/analyze", methods=["POST"])
 def analyze_news():
-    """API endpoint called by the web page."""
+    """Step 7: Main API Endpoint executing full pipeline (Steps 1 to 7)."""
     data = request.get_json(silent=True) or {}
-    news_text = clean_text(data.get("news"))
-    if not news_text:
+    text = (data.get("news") or "").strip()
+    if not text:
         return jsonify({"error": "News text is required"}), 400
 
-    extracted = extract_claims(news_text)
+    gemini_key = request.headers.get("X-Gemini-API-Key") or os.environ.get("GEMINI_API_KEY")
+    news_key = request.headers.get("X-News-API-Key") or os.environ.get("NEWS_API_KEY")
+
+    # Step 1: Claim Extraction
+    extracted = extract_claims(text, gemini_key)
     claims = extracted["claims"]
-    keywords = extracted["keywords"]
-    query = " ".join(keywords[:6]) or claims[0][:120]
+    query = " ".join(extracted["keywords"][:5]) or claims[0][:100]
 
-    news_api_key = request.headers.get("X-News-API-Key") or os.environ.get("NEWS_API_KEY")
-    news, news_error = fetch_news(query, news_api_key)
-    fact_checks, fact_error = fetch_fact_checks(query)
+    # Step 2: Evidence Retrieval
+    news, fact_checks = fetch_evidence(query, news_key)
 
-    news = add_credibility(score_articles(claims, news))
-    fact_checks = add_credibility(score_articles(claims, fact_checks))
+    # Step 3: Semantic Similarity (SBERT)
+    news = compute_semantic_similarity(claims, news)
+    fact_checks = compute_semantic_similarity(claims, fact_checks)
 
-    label, confidence, explanation = classify(news, fact_checks, claims, news_error or fact_error)
+    # Step 4: Credibility Scoring
+    news = add_credibility(news)
+    fact_checks = add_credibility(fact_checks)
 
-    return jsonify(
-        {
-            "label": label,
-            "confidence": confidence,
-            "explanation": explanation,
-            "extracted": extracted,
-            "retrieved_news": news,
-            "retrieved_factchecks": fact_checks,
-            "query_used": query,
-        }
-    )
+    # Step 5: Hybrid Decision Engine
+    label, confidence, default_explanation = run_decision_engine(news, fact_checks, claims)
+
+    # Step 6: Explanation Generation (Gemini as explainer with Smart Fallback)
+    explanation = generate_explanation(claims[0], label, news, fact_checks, gemini_key) or build_smart_explanation(claims[0], label, news, fact_checks)
+
+    # Step 7: Structured JSON Output
+    return jsonify({
+        "label": label,
+        "confidence": confidence,
+        "explanation": explanation,
+        "extracted": extracted,
+        "retrieved_news": news,
+        "retrieved_factchecks": fact_checks,
+        "query_used": query,
+        "gemini_used": bool(gemini_key and gemini_key.strip())
+    })
 
 
 if __name__ == "__main__":

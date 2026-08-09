@@ -203,78 +203,69 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
 </head>
 <body>
     <nav>
-   <div class="logo">
-            FakeXpose AI <i class="fa-solid fa-shield"></i>
+        <div class="logo">
+            FakeXpose AI
         </div>
-  <div class="nav-links">
+        <div class="nav-links">
             <a href="home.html">Home</a>
-            <a href="#">About</a>
-            <a href="#">Contact</a>
+            <a href="howit.html">About</a>
             <a href="signup.html">Signup</a>
- </div>
+        </div>
     </nav>
- 
+
+    <div class="container">
+        <div class="forms">
+            <h2>Login Now</h2>
+            <form action="">
+                <label for="name">Enter Email ID</label><br>
+                <input type="email" name="email" id="email" required><br>
+
+                <label for="password">Enter Your password</label><br>
+                <input type="password" name="password" id="password">
+                <p>Forgot password? <a href="#" id="reset"> Click Here</a></p><br>
+
+                <input type="submit" value="submit">
+                <button type="button" id="googleSignIn" class="google-btn">
+                    <i class="fa-brands fa-google"></i> Login with Google
+                </button>
+                <p>Don't Have an Account? <a href="signup.html" id="para"> Signup Now</a></p>
+            </form>
+        </div>
     </div>
- <div class="container">
-    <div class="forms">
-          <h2>Login Now</h2>
-        <form action="">
-            <label for="name">Enter Email ID</label><br>
-            <input type="email" name="email" id="email" required><br>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
+        import {
+            getAuth,
+            sendPasswordResetEmail,
+            signInWithEmailAndPassword,
+            GoogleAuthProvider,
+            signInWithPopup
+        } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
 
-            <label for="password">Enter Your password</label><br>
-            <input type="password" name="password" id="password">
-            <p>Forgot password? <a href="#" id="reset"> Click Here</a></p><br>
+        // Dynamic Firebase Configuration from backend .env
+        let firebaseConfig = {
+            apiKey: "AIzaSyDL_fcHMqPF26LrcaDgy6BSTSDx3iWT-XE",
+            authDomain: "fake-news-detection-f9154.firebaseapp.com",
+            projectId: "fake-news-detection-f9154",
+            storageBucket: "fake-news-detection-f9154.firebasestorage.app",
+            messagingSenderId: "327331005701",
+            appId: "1:327331005701:web:1c80a10522f4251d10636c"
+        };
 
-            <input type="submit" value="submit">
-            <button type="button" id="googleSignIn" class="google-btn">
-            <i class="fa-brands fa-google"></i> Login with Google
-            </button>
-            <p>Don't Have an Account? <a href="signup.html" id="para"> Signup Now</a></p>
-        </form>
-    </div>
-</div>
-<script type="module">
+        try {
+            const configRes = await fetch("http://localhost:5000/api/config");
+            if (configRes.ok) {
+                const configData = await configRes.json();
+                if (configData.firebase && configData.firebase.apiKey) {
+                    firebaseConfig = configData.firebase;
+                }
+            }
+        } catch (err) {
+            console.warn("Backend config unavailable, using fallback config.");
+        }
 
-import { initializeApp } 
-from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
-
-
-import {
-    getAuth,
-    sendPasswordResetEmail,
-    signInWithEmailAndPassword,
-    GoogleAuthProvider,
-    signInWithPopup
-}
-from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
-
-
-// Firebase Configuration
-
-const firebaseConfig = {
-
-    apiKey: "AIzaSyDL_fcHMqPF26LrcaDgy6BSTSDx3iWT-XE",
-
-    authDomain: "fake-news-detection-f9154.firebaseapp.com",
-
-    projectId: "fake-news-detection-f9154",
-
-    storageBucket: "fake-news-detection-f9154.firebasestorage.app",
-
-    messagingSenderId: "327331005701",
-
-    appId: "1:327331005701:web:1c80a10522f4251d10636c"
-
-};
-
-
-//  Firebase
-
-const app = initializeApp(firebaseConfig);
-
-
-const auth = getAuth(app);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
 
 //Email Pass Login
 

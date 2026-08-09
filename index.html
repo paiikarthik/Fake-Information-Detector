@@ -236,7 +236,7 @@ textarea{min-height:130px}
     <!-- NAVBAR -->
     <nav>
         <div class="logo">
-            <i class="fa-solid fa-shield-halved"></i> FakeXpose AI
+          </i> FakeXpose AI
         </div>
         <div class="nav-links">
             <div class="tex">
@@ -399,8 +399,8 @@ textarea{min-height:130px}
                 <h3>API Key Configuration</h3>
                 <button class="close-btn" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.5;">
-                Enter the API Keys.
+            <p id="envConfigNotice" style="font-size: 0.88rem; color: var(--accent); line-height: 1.5; margin-bottom: 10px;">
+                API keys configured in server .env will be used automatically. You can also provide custom override keys below:
             </p>
             
             <div class="input-item">
@@ -435,7 +435,7 @@ textarea{min-height:130px}
             signOut
         } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
 
-        const firebaseConfig = {
+        let firebaseConfig = {
             apiKey: "AIzaSyDL_fcHMqPF26LrcaDgy6BSTSDx3iWT-XE",
             authDomain: "fake-news-detection-f9154.firebaseapp.com",
             projectId: "fake-news-detection-f9154",
@@ -443,6 +443,18 @@ textarea{min-height:130px}
             messagingSenderId: "327331005701",
             appId: "1:327331005701:web:1c80a10522f4251d10636c"
         };
+
+        try {
+            const configRes = await fetch("http://localhost:5000/api/config");
+            if (configRes.ok) {
+                const configData = await configRes.json();
+                if (configData.firebase && configData.firebase.apiKey) {
+                    firebaseConfig = configData.firebase;
+                }
+            }
+        } catch (err) {
+            console.warn("Backend config endpoint unavailable, using fallback config.");
+        }
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);

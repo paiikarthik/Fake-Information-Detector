@@ -156,13 +156,12 @@ body{
 </head>
 <body>
     <div class="navbar">
-    <div id="logo">FakeXpose AI <i class="fa-solid fa-shield"></i></div>
+    <div id="logo">FakeXpose AI</div>
 
     <nav id="navig">
         <ul>
             <li><a href="home.html">Home</a></li>
-            <li><a href="#">About</a></li>
-            <li><a href="#">Contact</a></li>
+            <li><a href="howit.html">About</a></li>
             <li><a href="Login.html">Login</a></li>
         </ul>
 
@@ -230,7 +229,7 @@ let passwordError = document.getElementById("passwordError");
 
     emailInput.addEventListener("input", function () {
 
-        let emailPattern = /^[^ ]+@[^ ]+\.[a-z]{2,3}$/;
+        let emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
         if (!emailInput.value.match(emailPattern)) {
             emailError.textContent = "Enter valid email";
@@ -304,8 +303,8 @@ import {
   updateProfile
 } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
 
-// Firebase Config
-const firebaseConfig = {
+// Dynamic Firebase Configuration from backend .env
+let firebaseConfig = {
   apiKey: "AIzaSyDL_fcHMqPF26LrcaDgy6BSTSDx3iWT-XE",
   authDomain: "fake-news-detection-f9154.firebaseapp.com",
   projectId: "fake-news-detection-f9154",
@@ -314,6 +313,17 @@ const firebaseConfig = {
   appId: "1:327331005701:web:1c80a10522f4251d10636c"
 };
 
+try {
+  const configRes = await fetch("http://localhost:5000/api/config");
+  if (configRes.ok) {
+    const configData = await configRes.json();
+    if (configData.firebase && configData.firebase.apiKey) {
+      firebaseConfig = configData.firebase;
+    }
+  }
+} catch (err) {
+  console.warn("Backend config unavailable, using fallback config.");
+}
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
