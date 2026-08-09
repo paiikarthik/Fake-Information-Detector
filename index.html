@@ -242,12 +242,6 @@ textarea{min-height:130px}
             <div class="tex">
                <h4><a href="howit.html"> How it works</a></h4>
             </div>
-            <div class="tex">
-               <h4><a href="requirements.html"> Requirements</a></h4>
-            </div>
-            <!-- <button id="config-btn" class="secondary-btn" onclick="openModal()">
-                <i class="fa-solid fa-sliders"></i> Configuration
-            </button> -->
             <div class="auth-area">
                 <div id="user-chip" class="user-chip">
                     <i class="fa-solid fa-circle-user"></i>
@@ -395,33 +389,7 @@ textarea{min-height:130px}
         </div>
     </div>
 
-    <!-- CONFIGURATION MODAL -->
-    <div id="configModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>API Key Configuration</h3>
-                <button class="close-btn" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <p id="envConfigNotice" style="font-size: 0.88rem; color: var(--accent); line-height: 1.5; margin-bottom: 10px;">
-                API keys configured in server .env will be used automatically. You can also provide custom override keys below:
-            </p>
-            
-            <div class="input-item">
-                <label for="geminiKeyInput">Gemini API Key (Generative AI)</label>
-                <input type="password" id="geminiKeyInput" placeholder="AIzaSy...">
-            </div>
 
-            <div class="input-item">
-                <label for="newsKeyInput">NewsAPI Key (everything endpoint)</label>
-                <input type="password" id="newsKeyInput" placeholder="e.g., 4a123f...">
-            </div>
-
-            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 1rem;">
-                <button class="secondary-btn" onclick="closeModal()">Cancel</button>
-                <button class="primary-btn" style="box-shadow: none; padding: 10px 20px;" onclick="saveConfig()">Save API Keys</button>
-            </div>
-        </div>
-    </div>
 
     <!-- FOOTER -->
     <footer>

@@ -74,7 +74,7 @@ REFUTATION_WORDS = (
     "incorrect", "no evidence", "baseless", "fabricated", "scam", "manipulated",
     "denies", "denied", "misconstrued", "myth", "rumor", "rumour", "unfounded",
     "disproven", "refuted", "refutes", "conspiracy", "falsehood", "inaccurate",
-    "mythbuster", "fact check", "fact-check", "does not contain", "no tracking", "not true", "flawed"
+    "not true", "flawed", "pants on fire", "fake news", "flat earther", "flat earthers"
 )
 
 _sbert_model = None
@@ -262,47 +262,91 @@ def add_credibility(articles):
 def run_decision_engine(news, fact_checks, claims):
     """
     Step 5: Hybrid Decision Engine
-    Calculates final score and verdict based on evidence signals:
-      Score = (Similarity * 0.5) + (Credibility/100 * 0.3) + (FactCheck * 0.2)
+    Calculates final score and verdict based on evidence signals.
+    Requires semantic similarity (>= 0.40) before marking articles as refutations or verification.
     """
     all_articles = news + fact_checks
 
-    # Rule 1: Trusted Fact-Check Refutation / Debunking
-    for fc in fact_checks:
-        title_lower = fc["title"].lower()
-        if fc["similarity"] >= 0.35 or any(w in title_lower for w in REFUTATION_WORDS):
-            if any(w in title_lower for w in REFUTATION_WORDS) or "factcheck" in title_lower or "snopes" in title_lower:
-                return "FALSE", 0.90, f"Refuted by fact-checking reports from {fc['source']} ('{fc['title']}')."
-
-    # Rule 2: Credible Source Refutation
+    # Rule 1: High-similarity Fact-Check or Credible Source Refutation / Debunking
     for art in all_articles:
         title_lower = art["title"].lower()
-        if art["credibility"] >= 75 and any(w in title_lower for w in REFUTATION_WORDS):
-            return "FALSE", 0.85, f"Refuted by news reports from {art['source']} ('{art['title']}'), indicating the claim is inaccurate or a rumor."
+        # Article MUST be semantically relevant to the claim (similarity >= 0.40)
+        if art["similarity"] >= 0.40 and any(w in title_lower for w in REFUTATION_WORDS):
+            return "FALSE", 0.90, f"Refuted by reports from {art['source']} ('{art['title']}')."
 
-    # Rule 3: Supporting Evidence Calculation (Exclude articles containing refutation words)
+    # Rule 2: Supporting Evidence Calculation (Similarity >= 0.45, Credibility >= 70, no refutation words, no question titles)
     supporting = [
-        a for a in news
+        a for a in news + fact_checks
         if a["similarity"] >= 0.45
         and a["credibility"] >= 70
         and not any(w in a["title"].lower() for w in REFUTATION_WORDS)
+        and not a["title"].strip().endswith("?")
+        and not re.search(r"^(is|was|can|could|does|did|will|would|has|have|had|are|were)\b", a["title"].lower().strip())
     ]
     if supporting:
         best = supporting[0]
         score = round((best["similarity"] * 0.5) + (best["credibility"] / 100 * 0.3) + 0.2, 2)
         return "VERIFIED", min(1.0, score), f"Verified by reports from {best['source']} ('{best['title']}')."
 
-    # Rule 4: Weak or Missing Evidence
+    # Rule 3: Moderate Similarity / Missing Specific News -> UNVERIFIED (Never default to FALSE unless explicitly debunked!)
     best_sim = max((a["similarity"] for a in all_articles), default=0.0)
-    if best_sim < 0.35:
-        return "FALSE", 0.65, "No trusted matching evidence was found online for this claim."
+    if best_sim >= 0.35:
+        return "UNVERIFIED", 0.55, "Related news coverage was retrieved, but evidence is not strong enough to conclusively prove or refute."
 
-    return "UNVERIFIED", 0.50, "Related news articles were found, but the evidence is not strong enough to confirm or refute."
+    return "UNVERIFIED", 0.50, "No definitive matching news evidence was found online for this specific claim."
 
 
 # ==============================================================================
-# STEP 6: GEMINI EXPLANATION GENERATOR
+# STEP 6: GEMINI VERIFIER & EXPLANATION GENERATOR
 # ==============================================================================
+
+def verify_with_gemini(claim, news, fact_checks, api_key):
+    """Verify the claim using Gemini API when key is available."""
+    if not api_key or not api_key.strip():
+        return None
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key.strip()}"
+    
+    evidence_lines = []
+    for art in (fact_checks + news)[:6]:
+        evidence_lines.append(f"- Source: {art.get('source')} | Title: {art.get('title')} | Similarity: {art.get('similarity', 0)}")
+    evidence_text = "\n".join(evidence_lines) if evidence_lines else "No direct news articles retrieved."
+
+    prompt = (
+        "You are an expert fact-checking engine.\n"
+        f"User Claim: '{claim}'\n\n"
+        "Retrieved Evidence:\n"
+        f"{evidence_text}\n\n"
+        "Evaluate the factual truthfulness of the User Claim based on real-world facts and retrieved evidence.\n"
+        "1. If the claim is factually true and well-established, set 'verdict' to 'VERIFIED'.\n"
+        "2. If the claim is factually false, a hoax, or contradicted by evidence, set 'verdict' to 'FALSE'.\n"
+        "3. If there is insufficient evidence or the claim is ambiguous, set 'verdict' to 'UNVERIFIED'.\n\n"
+        "Return STRICT JSON only in this format:\n"
+        "{\n"
+        '  "verdict": "VERIFIED" | "FALSE" | "UNVERIFIED",\n'
+        '  "confidence": 0.95,\n'
+        '  "explanation": "Concise 1-2 sentence professional explanation confirming or refuting the claim."\n'
+        "}"
+    )
+
+    try:
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"responseMimeType": "application/json"}
+        }
+        res = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=8)
+        if res.status_code == 200:
+            data = json.loads(res.json()["candidates"][0]["content"]["parts"][0]["text"])
+            verdict = str(data.get("verdict", "UNVERIFIED")).upper()
+            confidence = float(data.get("confidence", 0.70))
+            explanation = data.get("explanation") or ""
+            if verdict in ("VERIFIED", "FALSE", "UNVERIFIED"):
+                return verdict, confidence, explanation
+    except Exception as e:
+        print("Gemini verification error:", e)
+
+    return None
+
 
 def build_smart_explanation(claim, verdict, news, fact_checks):
     """Construct a fluent, professional, human-like evidence summary matching research standards."""
@@ -331,7 +375,7 @@ def build_smart_explanation(claim, verdict, news, fact_checks):
 
 
 def generate_explanation(claim, verdict, news, fact_checks, gemini_api_key=None):
-    """Step 6: Gemini acts ONLY as explanation generator based on retrieved evidence."""
+    """Step 6: Gemini acts as explanation generator based on retrieved evidence."""
     if not gemini_api_key or not gemini_api_key.strip():
         return None
 
@@ -408,11 +452,13 @@ def analyze_news():
     news = add_credibility(news)
     fact_checks = add_credibility(fact_checks)
 
-    # Step 5: Hybrid Decision Engine
-    label, confidence, default_explanation = run_decision_engine(news, fact_checks, claims)
-
-    # Step 6: Explanation Generation (Gemini as explainer with Smart Fallback)
-    explanation = generate_explanation(claims[0], label, news, fact_checks, gemini_key) or build_smart_explanation(claims[0], label, news, fact_checks)
+    # Step 5: Primary Verification (Gemini AI if key available, else Rule Engine)
+    gemini_res = verify_with_gemini(claims[0], news, fact_checks, gemini_key)
+    if gemini_res:
+        label, confidence, explanation = gemini_res
+    else:
+        label, confidence, default_explanation = run_decision_engine(news, fact_checks, claims)
+        explanation = generate_explanation(claims[0], label, news, fact_checks, gemini_key) or default_explanation or build_smart_explanation(claims[0], label, news, fact_checks)
 
     # Step 7: Structured JSON Output
     return jsonify({
