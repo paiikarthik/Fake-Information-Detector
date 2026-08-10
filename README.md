@@ -20,3 +20,19 @@ Gemini extracts claims, keywords, and entities. If Gemini is not configured, the
 6. **Final Verdict:** The decision engine combines fact-check stance, semantic similarity, source credibility, refutation words, and critical event alignment to produce VERIFIED, FALSE, or UNVERIFIED.
 
 7. **Gemini API** It Understands the user context and compare the user meaning with news.
+
+## Requirements
+1. flask>=3.0.0
+2. requests>=2.31.0
+3. sentence-transformers>=2.2.2
+4. nltk>=3.8.1
+5. google-generativeai>=0.3.0
+6. python-dotenv>=1.0.0
+7. gunicorn>=21.2.0
+8. flask-cors>=4.0.0
+
+```bash
+pip install -r requirements.txt
+```
+
+
