@@ -35,4 +35,6 @@ Gemini extracts claims, keywords, and entities. If Gemini is not configured, the
 pip install -r requirements.txt
 ```
 
+## Demo:
+[Live Link](https://fake-information-detector.onrender.com/home.html)
 
