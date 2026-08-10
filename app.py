@@ -74,8 +74,54 @@ REFUTATION_WORDS = (
     "incorrect", "no evidence", "baseless", "fabricated", "scam", "manipulated",
     "denies", "denied", "misconstrued", "myth", "rumor", "rumour", "unfounded",
     "disproven", "refuted", "refutes", "conspiracy", "falsehood", "inaccurate",
-    "not true", "flawed", "pants on fire", "fake news", "flat earther", "flat earthers"
+    "not true", "flawed", "pants on fire", "fake news", "flat earther", "flat earthers",
+    "no,", "no:", "do not", "does not", "did not", "don't", "doesn't", "didn't",
+    "never", "cannot", "won't", "isn't", "aren't", "fact check", "fact-check",
+    "rejected", "rejects", "denial", "fake viral", "viral post", "misleading claim"
 )
+
+REFUTATION_REGEX = re.compile(
+    r"^\s*no[,:\s]"  # Matches headlines starting with "No," or "No:" or "No " (e.g., "No, 5G...")
+    r"|\b(do|does|did|can|could|will|would|has|have|is|are)\s+not\b"  # "does not kill", "is not true"
+    r"|\b(don't|doesn't|didn't|can't|won't|isn't|aren't)\b"  # "doesn't kill"
+    r"|\b(fake|false|hoax|myth|debunk|debunked|untrue|baseless|misleading|unfounded|refuted|refutation|disproven|no\s+evidence|not\s+true|inaccurate|fact\s*check|factcheck|misleading)\b",
+    re.IGNORECASE
+)
+
+SUB_MINISTER_ROLES = [
+    "education minister", "finance minister", "defense minister", "defence minister",
+    "home minister", "health minister", "sports minister", "railway minister",
+    "foreign minister", "deputy minister", "cabinet minister", "junior minister",
+    "law minister", "agriculture minister", "environment minister", "chief minister",
+    "spokesperson", "press secretary", "aide", "lawyer", "advisor", "adviser"
+]
+
+def validate_subject_role_alignment(claim, headline_title):
+    """
+    Ensure the primary target subject role in the claim matches the article subject.
+    Prevents sub-roles (e.g. 'education minister') from falsely matching main roles (e.g. 'prime minister').
+    """
+    c_lower = (claim or "").lower()
+    h_lower = (headline_title or "").lower()
+
+    # Check if claim targets Prime Minister / President / Head of State
+    claim_mentions_pm = bool(re.search(r"\b(prime minister|pm|president)\b", c_lower))
+
+    if claim_mentions_pm:
+        # Check if headline is about a sub-minister or aide without confirming PM's action
+        for sub_role in SUB_MINISTER_ROLES:
+            if sub_role in h_lower:
+                if not re.search(r"\b(prime minister|pm)\s+(resigns|resigned|quits|steps down|step down)\b", h_lower):
+                    return False
+
+    return True
+
+def is_refutation_headline(title):
+    """Check if an article title refutes or debunks a claim."""
+    title_lower = (title or "").lower().strip()
+    if REFUTATION_REGEX.search(title_lower):
+        return True
+    return any(w in title_lower for w in REFUTATION_WORDS)
 
 _sbert_model = None
 
@@ -115,9 +161,9 @@ def extract_claims(text, gemini_api_key=None):
     sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", cleaned) if len(s.split()) >= 3]
     claims = sentences[:3] if sentences else [cleaned]
     words = re.findall(r"[A-Za-z][A-Za-z'-]{2,}", cleaned.lower())
-    stop = {"the", "and", "for", "with", "that", "this", "from", "have", "has", "was", "were", "are"}
+    stop = {"the", "and", "for", "with", "that", "this", "from", "have", "has", "was", "were", "are", "about"}
     keywords = list(dict.fromkeys(w for w in words if w not in stop))[:8]
-    entities = list(dict.fromkeys(re.findall(r"\b[A-Z][a-z]+\b", cleaned)))[:6]
+    entities = list(dict.fromkeys(re.findall(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b", cleaned)))[:6]
 
     return {"claims": claims, "keywords": keywords, "entities": entities}
 
@@ -263,35 +309,55 @@ def run_decision_engine(news, fact_checks, claims):
     """
     Step 5: Hybrid Decision Engine
     Calculates final score and verdict based on evidence signals.
-    Requires semantic similarity (>= 0.40) before marking articles as refutations or verification.
+    Requires strict semantic similarity (>= 0.72) AND subject-role alignment
+    before marking articles as positive verification.
     """
     all_articles = news + fact_checks
+    primary_claim = claims[0] if claims else ""
 
     # Rule 1: High-similarity Fact-Check or Credible Source Refutation / Debunking
     for art in all_articles:
-        title_lower = art["title"].lower()
-        # Article MUST be semantically relevant to the claim (similarity >= 0.40)
-        if art["similarity"] >= 0.40 and any(w in title_lower for w in REFUTATION_WORDS):
+        # Article MUST be semantically relevant to the claim (similarity >= 0.35)
+        if art["similarity"] >= 0.35 and is_refutation_headline(art["title"]):
             return "FALSE", 0.90, f"Refuted by reports from {art['source']} ('{art['title']}')."
 
-    # Rule 2: Supporting Evidence Calculation (Similarity >= 0.45, Credibility >= 70, no refutation words, no question titles)
+    # Rule 2: Strict Supporting Evidence Calculation
+    # Requires: Similarity >= 0.72, Credibility >= 70, Subject Alignment, No Refutation, No Question Headlines
     supporting = [
-        a for a in news + fact_checks
-        if a["similarity"] >= 0.45
+        a for a in all_articles
+        if a["similarity"] >= 0.72
         and a["credibility"] >= 70
-        and not any(w in a["title"].lower() for w in REFUTATION_WORDS)
+        and validate_subject_role_alignment(primary_claim, a["title"])
+        and not is_refutation_headline(a["title"])
         and not a["title"].strip().endswith("?")
         and not re.search(r"^(is|was|can|could|does|did|will|would|has|have|had|are|were)\b", a["title"].lower().strip())
     ]
     if supporting:
         best = supporting[0]
-        score = round((best["similarity"] * 0.5) + (best["credibility"] / 100 * 0.3) + 0.2, 2)
-        return "VERIFIED", min(1.0, score), f"Verified by reports from {best['source']} ('{best['title']}')."
+        score = round((best["similarity"] * 0.5) + (best["credibility"] / 100 * 0.4) + 0.1, 2)
+        return "VERIFIED", min(0.98, max(0.70, score)), f"Verified by reports from {best['source']} ('{best['title']}')."
 
-    # Rule 3: Moderate Similarity / Missing Specific News -> UNVERIFIED (Never default to FALSE unless explicitly debunked!)
+    # Rule 3: Related Coverage Found but Subject Mismatch or Insufficient Similarity
     best_sim = max((a["similarity"] for a in all_articles), default=0.0)
+    has_role_mismatch = any(
+        a["similarity"] >= 0.35 and not validate_subject_role_alignment(primary_claim, a["title"])
+        for a in all_articles
+    )
+
+    if has_role_mismatch:
+        return (
+            "UNVERIFIED",
+            0.50,
+            "Retrieved news coverage addresses related topics (such as cabinet or ministerial developments), "
+            "but no credible report confirms that the primary subject resigned as claimed."
+        )
+
     if best_sim >= 0.35:
-        return "UNVERIFIED", 0.55, "Related news coverage was retrieved, but evidence is not strong enough to conclusively prove or refute."
+        return (
+            "UNVERIFIED",
+            0.55,
+            "Related news coverage was retrieved, but evidence is not strong enough to conclusively verify or refute the claim."
+        )
 
     return "UNVERIFIED", 0.50, "No definitive matching news evidence was found online for this specific claim."
 
@@ -318,13 +384,16 @@ def verify_with_gemini(claim, news, fact_checks, api_key):
         "Retrieved Evidence:\n"
         f"{evidence_text}\n\n"
         "Evaluate the factual truthfulness of the User Claim based on real-world facts and retrieved evidence.\n"
-        "1. If the claim is factually true and well-established, set 'verdict' to 'VERIFIED'.\n"
-        "2. If the claim is factually false, a hoax, or contradicted by evidence, set 'verdict' to 'FALSE'.\n"
-        "3. If there is insufficient evidence or the claim is ambiguous, set 'verdict' to 'UNVERIFIED'.\n\n"
+        "IMPORTANT RULES:\n"
+        "1. Strictly check whether retrieved evidence actually refers to the EXACT subject person and role in the claim.\n"
+        "   - E.g., if claim is 'PM Narendra Modi resigned' but articles are only about an 'education minister' quitting or unrelated cabinet member, do NOT set verdict to VERIFIED.\n"
+        "2. If retrieved evidence or fact-checks refute the claim (or if the claim is a known false rumor), set 'verdict' to 'FALSE'.\n"
+        "3. If the claim is factually true and directly supported by matching evidence, set 'verdict' to 'VERIFIED'.\n"
+        "4. If evidence is missing, unconfirmed, or refers to a different person/position, set 'verdict' to 'UNVERIFIED'.\n\n"
         "Return STRICT JSON only in this format:\n"
         "{\n"
         '  "verdict": "VERIFIED" | "FALSE" | "UNVERIFIED",\n'
-        '  "confidence": 0.95,\n'
+        '  "confidence": 0.85,\n'
         '  "explanation": "Concise 1-2 sentence professional explanation confirming or refuting the claim."\n'
         "}"
     )
